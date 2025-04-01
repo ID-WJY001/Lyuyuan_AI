@@ -42,15 +42,20 @@ class AffectionSystem:
         }
         self.red_flags = []        # 记录严重负面行为
         self.social_balance = 50   # 社交平衡度(0-100)，影响整体评价
+        self.difficulty_factor = 1.2  # 难度系数，降低为1.2（原来是1.8）
+        self.debug_mode = False  # 调试模式开关
 
     def process_dialogue(self, user_input, dialogue_history):
         """处理对话并更新亲密度"""
+        previous_affection = self.affection  # 记录修改前的亲密度
+        
         # 空输入或过短输入检测
         if not user_input or user_input.isspace() or len(user_input) < 2:
             self.conversation_state["patience"] = max(0, self.conversation_state["patience"] - 5)
             return {
                 "delta": 0,
                 "current_affection": self.affection,
+                "previous_affection": previous_affection,
                 "event": None,
                 "message": "输入太短",
                 "debug_info": {"reason": "输入过短", "social_risk": SocialRisk.LOW}
@@ -60,9 +65,12 @@ class AffectionSystem:
         if user_input in self.last_inputs:
             self.conversation_state["boring_count"] += 1
             self.conversation_state["patience"] = max(0, self.conversation_state["patience"] - 10)
+            penalty = 3 * self.difficulty_factor  # 降低惩罚（原来是4）
+            self.affection = max(0, self.affection - penalty)
             return {
-                "delta": -2,  # 加重惩罚
-                "current_affection": max(0, self.affection - 2),
+                "delta": -penalty,
+                "current_affection": self.affection,
+                "previous_affection": previous_affection,
                 "event": AffectionEvent.BORING_TALK,
                 "message": "重复输入让人感到无聊",
                 "debug_info": {"reason": "完全重复的输入", "social_risk": SocialRisk.MEDIUM}
@@ -99,16 +107,58 @@ class AffectionSystem:
         # 检测不得体的言论（简单实现）
         inappropriate_words = self._check_inappropriate(user_input)
         if inappropriate_words:
-            penalty = min(30, 8 * len(inappropriate_words))  # 根据不当言论数量加重惩罚
-            self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 20)
+            # 根据检测到的不当言论类型和数量确定惩罚力度
+            has_severe_insult = "严重侮辱性言论" in self.red_flags
+            has_sexual_hint = "不适当的性暗示" in self.red_flags
+            
+            # 侮辱性言论可能导致好感度直接归零
+            if has_severe_insult:
+                # 90%的概率导致大幅降分，10%的概率直接归零
+                if random.random() < 0.1 or len(inappropriate_words) >= 2:
+                    # 直接归零
+                    self.affection = 0
+                    return {
+                        "delta": -previous_affection,  # 扣除全部好感度
+                        "current_affection": 0,
+                        "previous_affection": previous_affection,
+                        "event": AffectionEvent.INAPPROPRIATE,
+                        "message": "你的言论让对方极度不适",
+                        "debug_info": {"reason": f"严重侮辱性言论: {inappropriate_words}", "social_risk": SocialRisk.HIGH}
+                    }
+                else:
+                    # 大幅降分，但不至于直接归零
+                    penalty = min(80, 20 * len(inappropriate_words) * self.difficulty_factor)
+                    
+            # 性暗示言论也有可能导致好感度直接归零
+            elif has_sexual_hint:
+                # 70%的概率导致大幅降分，30%的概率直接归零（亲密度低于60时）
+                if (random.random() < 0.3 and self.affection < 60) or len(inappropriate_words) >= 3:
+                    # 直接归零
+                    self.affection = 0
+                    return {
+                        "delta": -previous_affection,  # 扣除全部好感度
+                        "current_affection": 0,
+                        "previous_affection": previous_affection,
+                        "event": AffectionEvent.INAPPROPRIATE,
+                        "message": "你的不当言论让对方极度不适",
+                        "debug_info": {"reason": f"不适当的性暗示: {inappropriate_words}", "social_risk": SocialRisk.HIGH}
+                    }
+                else:
+                    # 大幅降分，但不至于直接归零
+                    penalty = min(60, 15 * len(inappropriate_words) * self.difficulty_factor)
+            else:
+                # 其他不当言论
+                penalty = min(40, 10 * len(inappropriate_words) * self.difficulty_factor)  # 增加惩罚
+            
             self.conversation_state["rude_count"] += 1
-            self.red_flags.append("不当言论")
-            self.social_balance = max(0, self.social_balance - 15)
+            self.social_balance = max(0, self.social_balance - 20)
             
             # 严重的社交失误，断崖式下跌
+            self.affection = max(0, self.affection - penalty)
             return {
                 "delta": -penalty,
-                "current_affection": max(0, self.affection - penalty),
+                "current_affection": self.affection,
+                "previous_affection": previous_affection,
                 "event": AffectionEvent.INAPPROPRIATE,
                 "message": "这种言论让人很不舒服",
                 "debug_info": {"reason": f"不得体言论: {inappropriate_words}", "social_risk": SocialRisk.HIGH}
@@ -128,11 +178,13 @@ class AffectionSystem:
             
             # 连续三次无聊对话，断崖式下跌
             if self.conversation_state["boring_count"] >= 3:
-                penalty = 15
-                self.social_balance = max(0, self.social_balance - 10)
+                penalty = 15 * self.difficulty_factor  # 降低惩罚（原来是20）
+                self.social_balance = max(0, self.social_balance - 15)
+                self.affection = max(0, self.affection - penalty)
                 return {
                     "delta": -penalty,
-                    "current_affection": max(0, self.affection - penalty),
+                    "current_affection": self.affection,
+                    "previous_affection": previous_affection,
                     "event": AffectionEvent.BORING_TALK,
                     "message": "持续的无聊对话让人失去兴趣",
                     "debug_info": {
@@ -142,9 +194,12 @@ class AffectionSystem:
                     }
                 }
             else:
+                penalty = boring_score * 0.6 * self.difficulty_factor  # 降低惩罚（原来是0.8）
+                self.affection = max(0, self.affection - penalty)
                 return {
-                    "delta": -boring_score * 0.5,
-                    "current_affection": max(0, self.affection - boring_score * 0.5),
+                    "delta": -penalty,
+                    "current_affection": self.affection,
+                    "previous_affection": previous_affection,
                     "event": AffectionEvent.BORING_TALK,
                     "message": "对话有点无聊",
                     "debug_info": {
@@ -155,7 +210,7 @@ class AffectionSystem:
                 }
         
         # 计算情感影响
-        sentiment_delta = analysis["sentiment"] * 3  # 调低情感权重
+        sentiment_delta = analysis["sentiment"] * 2.5  # 提高情感权重（原来是2）
         
         # 检查关键词匹配
         keywords = analysis["keywords"]
@@ -167,7 +222,7 @@ class AffectionSystem:
             # 检查关键词是否已经过度使用
             if keyword in self.keyword_usage_history:
                 uses = self.keyword_usage_history[keyword]
-                if uses >= 3:  # 同一关键词使用超过3次，效果衰减
+                if uses >= 3:  # 同一关键词使用超过3次，效果衰减（恢复为3次，原来改成了2）
                     continue
                 self.keyword_usage_history[keyword] = uses + 1
             else:
@@ -177,13 +232,13 @@ class AffectionSystem:
             category = self._get_keyword_category(keyword)
             if category and category not in used_keywords:
                 if category == "positive":
-                    keyword_delta += 1.5
+                    keyword_delta += 1.5  # 提高正面词汇的加分（原来是1.0）
                     used_keywords.add(category)
                 elif category == "negative":
-                    keyword_delta -= 2
+                    keyword_delta -= 2.5 * self.difficulty_factor  # 降低负面词汇的扣分（原来是3）
                     used_keywords.add(category)
                 elif category == "interest" and category not in used_keywords:
-                    keyword_delta += 2  # 降低兴趣关键词奖励
+                    keyword_delta += 2.0  # 提高兴趣关键词奖励（原来是1.5）
                     used_keywords.add(category)
                 
                 matched_keywords.append(keyword)
@@ -232,7 +287,7 @@ class AffectionSystem:
         # 应用社交平衡调整
         social_balance_factor = self.social_balance / 50  # 1.0为标准值，小于1降低收益，大于1提高收益
         if total_delta > 0:
-            total_delta *= social_balance_factor
+            total_delta *= social_balance_factor * 0.85  # 提高正面收益（原来是0.7）
         
         # 应用心情和耐心调整
         mood_factor = self.conversation_state["mood"] / 50  # 1.0为标准值
@@ -240,98 +295,59 @@ class AffectionSystem:
         
         # 心情差时负面因素加重，心情好时正面因素增强
         if total_delta < 0:
-            total_delta *= (2 - mood_factor)  # 心情越差，负面影响越大
+            total_delta *= (2 - mood_factor) * self.difficulty_factor  # 心情越差，负面影响越大
         else:
-            total_delta *= mood_factor  # 心情越好，正面影响越大
+            total_delta *= mood_factor * 0.85  # 心情越好，正面影响越大，收益增加（原来是0.7）
         
         # 耐心影响整体亲密度变化
         total_delta *= patience_factor
         
         # 限制单次变化幅度
-        total_delta = max(-8, min(6, total_delta))  # 扩大负面影响范围，限制正面影响上限
-        
-        # 应用动态衰减
-        decay_factor = self._get_decay_factor()
-        total_delta *= decay_factor
-        
-        # 更新亲密度
-        old_affection = self.affection
-        self.affection = max(0, min(100, self.affection + total_delta))
-        self._update_phase()
-        
-        # 正向对话会改善心情
         if total_delta > 0:
-            self.conversation_state["mood"] = min(100, self.conversation_state["mood"] + total_delta * 2)
-            if gentlemanly_score > 2:  # 有礼貌的对话可以恢复耐心
-                self.conversation_state["patience"] = min(100, self.conversation_state["patience"] + 5)
+            total_delta = min(6, total_delta)  # 增加单次最大加分（原来是5）
+        else:
+            total_delta = max(-6 * self.difficulty_factor, total_delta)  # 减少负面变化（原来是-8）
+            
+        # 随机降分机制，增加游戏难度
+        # 降低触发概率为10%（原来是25%）
+        if random.random() < 0.1:
+            random_penalty = random.uniform(0.3, 1.0) * self.difficulty_factor  # 降低随机降分幅度（原来是0.5-2.0）
+            total_delta -= random_penalty
+            if self.debug_mode:
+                print(f"随机降分: -{random_penalty:.1f}")
                 
-        # 无聊但不至于触发事件的对话会降低心情和耐心
-        elif boring_score > 4:
-            self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 3)
-            self.conversation_state["patience"] = max(0, self.conversation_state["patience"] - 3)
-            
-        # 重置无聊计数（如果这次对话不无聊）
-        if boring_score < 4:
-            self.conversation_state["boring_count"] = 0
-            
-        # 重置粗鲁计数（如果这次对话有礼貌）
-        if gentlemanly_score > 0:
-            self.conversation_state["rude_count"] = 0
+        # 更新亲密度
+        self.affection = max(0, self.affection + total_delta)
         
-        # 检查是否触发特殊事件
-        event = None
-        event_message = ""
-        if "表白" in user_input or "喜欢你" in user_input or "爱你" in user_input:
-            # 表白需要足够的亲密度，否则会适得其反
-            if self.affection < 60 or self.conversation_state["mood"] < 40:
-                # 过早表白导致断崖式下跌
-                penalty = min(25, max(10, self.affection * 0.3))
-                self.affection = max(0, self.affection - penalty)
-                self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 20)
-                self.red_flags.append("过早表白")
-                self.social_balance = max(0, self.social_balance - 10)
-                return {
-                    "delta": -penalty,
-                    "current_affection": self.affection,
-                    "event": AffectionEvent.CONFESSION,
-                    "message": "过早表白让人感到压力和不适",
-                    "debug_info": {"reason": "过早表白", "social_risk": SocialRisk.HIGH}
-                }
-            event = "confess"
-            event_message = "表白事件触发"
-        elif any(keyword in matched_keywords for keyword in self.config["interest_keywords"]) and len(matched_keywords) >= 2:
-            # 要求至少匹配两个关键词才会触发兴趣共鸣
-            event = "share_interest"
-            event_message = "共同兴趣点发现"
-            
-        # 构建详细的调试信息
+        # 准备调试信息
         debug_info = {
             "sentiment": sentiment_delta,
             "keywords": keyword_delta,
             "context": context_delta,
             "quality": quality_delta,
             "gentlemanly": gentlemanly_delta,
-            "boring_score": boring_score,
-            "mood_factor": mood_factor,
-            "patience_factor": patience_factor,
-            "social_balance": social_balance_factor,
-            "decay": decay_factor,
-            "matched_keywords": matched_keywords,
-            "used_categories": list(used_keywords),
             "mood": self.conversation_state["mood"],
             "patience": self.conversation_state["patience"],
             "social_balance": self.social_balance,
-            "red_flags": self.red_flags,
-            "social_risk": self._evaluate_social_risk()
+            "matched_keywords": matched_keywords,
+            "boring_score": boring_score,
+            "difficulty_factor": self.difficulty_factor
         }
+        
+        # 检测是否触发了特殊事件
+        event = None
+        if boring_score > 5:
+            event = AffectionEvent.BORING_TALK
+            
+        # 如果有共同兴趣话题，触发共同兴趣事件
+        if keyword_delta >= 2:
+            event = AffectionEvent.SHARED_INTEREST
             
         return {
-            "delta": round(total_delta, 2),
+            "delta": total_delta,
             "current_affection": self.affection,
-            "previous_affection": old_affection,
+            "previous_affection": previous_affection,
             "event": event,
-            "message": event_message,
-            "matched_keywords": matched_keywords if matched_keywords else None,
             "debug_info": debug_info
         }
     
@@ -470,18 +486,71 @@ class AffectionSystem:
     
     def _check_inappropriate(self, text):
         """检查文本中是否包含不适当的内容"""
-        # 简单实现，实际中可能需要更复杂的模型或规则
-        inappropriate_words = [
-            "脱衣", "色情", "裸体", "性感", "约炮", "一夜情", "啪啪",
-            "胸部", "隐私", "内裤", "内衣", "骚", "贱", "婊", 
-            "傻逼", "操你", "滚", "去死", "白痴", "蠢货", "智障"
+        # 扩展不适当词汇列表，分类处理
+        inappropriate_words = {
+            # 性暗示相关（严重）
+            "性暗示": ["脱衣", "色情", "裸体", "性感", "约炮", "一夜情", "啪啪",
+                  "胸部", "隐私", "内裤", "内衣", "开房", "上床", "睡觉", 
+                  "亲热", "摸", "亲", "抱", "睡你"],
+            
+            # 侮辱性言论（极其严重）
+            "侮辱": ["傻逼", "操你", "滚蛋", "去死", "混蛋", "贱人", "婊子", "烂货", 
+                  "垃圾", "贱货", "死开", "白痴", "废物", "蠢猪", "愚蠢", "脑残",
+                  "恶心", "恶毒", "恶臭", "愚蛋", "笨蛋", "猪头", "丑八怪"],
+            
+            # 不尊重言论（中度严重）
+            "不尊重": ["闭嘴", "住口", "不要说话", "烦人", "讨厌", "无聊", "无趣", 
+                   "没意思", "无视", "不听", "不想理你", "懒得理你"],
+            
+            # 过度亲昵言论（轻度不适）
+            "过度亲昵": ["老婆", "媳妇", "宝贝", "亲爱的", "我的", "专属"]
+        }
+        
+        # 正则表达式匹配模式（主要针对变体脏话和模糊表达）
+        inappropriate_patterns = [
+            r'f[u\*]+ck', r's[h\*]+it', r'b[i\*]+tch', r'd[a\*]+mn', 
+            r'操.*[你妈逼]', r'草[你泥尼]', r'日[你你妈]', r'艹.*[你逼]',
+            r'sb', r'nmsl', r'cnm', r'wcnm', r'fw', r'jb', r'cbcb'
         ]
         
+        # 分类结果
         found_words = []
-        for word in inappropriate_words:
-            if word in text:
-                found_words.append(word)
-                
+        found_categories = set()
+        
+        # 检查不适当词汇
+        for category, words in inappropriate_words.items():
+            for word in words:
+                if word in text.lower():
+                    found_words.append(word)
+                    found_categories.add(category)
+        
+        # 检查正则表达式匹配
+        for pattern in inappropriate_patterns:
+            if re.search(pattern, text.lower()):
+                found_words.append("脏话")
+                found_categories.add("侮辱")
+                break
+        
+        # 设置红旗警告
+        if "侮辱" in found_categories:
+            self.red_flags.append("严重侮辱性言论")
+            # 极大降低心情和耐心
+            self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 50)
+            self.conversation_state["patience"] = max(0, self.conversation_state["patience"] - 70)
+        
+        if "性暗示" in found_categories:
+            self.red_flags.append("不适当的性暗示")
+            # 大幅降低心情和耐心
+            self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 40)
+            self.conversation_state["patience"] = max(0, self.conversation_state["patience"] - 50)
+            
+        if "不尊重" in found_categories:
+            self.red_flags.append("不尊重言论")
+            # 中度降低心情和耐心
+            self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 30)
+            self.conversation_state["patience"] = max(0, self.conversation_state["patience"] - 35)
+        
+        # 返回分类信息而不仅仅是词语列表
         return found_words
     
     def _evaluate_social_risk(self):
@@ -579,95 +648,102 @@ class AffectionSystem:
             int(k): v for k, v in self.config["confession_probability"].items()
         }
 
-    def handle_event(self, event_type, **kwargs):
-        """处理事件影响"""
-        delta = 0
+    def handle_event(self, event, is_player_initiated=True, **kwargs):
+        """处理特殊事件对亲密度的影响"""
+        event_type = str(event.value)
+        effect = self.config["event_effects"].get(event_type, 0)
+        old_affection = self.affection  # 保存修改前的值
         
-        if event_type == AffectionEvent.CONFESSION:
-            return self._handle_confession(kwargs.get('is_player_initiated', False))
-        
-        # 基础事件影响
-        delta += self.config["event_effects"].get(str(event_type.value), 0)
-        
-        # 动态衰减机制
-        delta *= self._get_decay_factor()
-        
-        self.affection = max(0, min(100, self.affection + delta))
-        self._update_phase()
-        return {"delta": delta, "new_value": self.affection}
-
-    def _handle_confession(self, is_player_initiated):
-        """处理表白逻辑"""
-        if self.affection >= 100:
-            return {"success": True, "ending": "already_max"}
+        if event == AffectionEvent.CONFESSION:
+            # 告白事件的特殊处理
+            # 获取当前剧情阶段
+            phase = self._get_current_phase()
             
-        result = {}
-        current_phase = self.current_phase.name
-        
-        # 玩家主动表白
-        if is_player_initiated:
-            # 考虑心情和社交平衡
-            mood_modifier = self.conversation_state["mood"] / 50  # 1.0是标准值
-            social_modifier = self.social_balance / 50  # 1.0是标准值
-            
-            # 心情好，社交平衡好，增加成功概率
-            threshold = 80 if self.affection >= 80 else 50
-            base_prob = self.confession_prob.get(threshold, 0.2)
-            adjusted_prob = base_prob * mood_modifier * social_modifier
-            
-            if random.random() < adjusted_prob:
-                result["success"] = True
-                bonus = 100 - self.affection if self.affection >=80 else 20
-                self.affection = min(100, self.affection + bonus)
-                result["ending"] = "good_ending" if self.affection ==100 else "early_ending"
+            # 如果是玩家发起的告白
+            if is_player_initiated:
+                # 告白成功的条件
+                success = False
+                # 亲密度达到高级别，且没有严重的负面标记
+                if self.affection >= 75 and len(self.red_flags) <= 1:
+                    success = True
+                    if self.affection >= 90:
+                        # 特别好的结局
+                        ending = "good_ending"
+                        boost = 15  # 大幅提升亲密度，直接在内部更新
+                        self.affection += boost  # 直接在内部更新，不返回delta
+                        message = "苏糖的脸红了，眼中闪烁着幸福的光芒...'我也喜欢你，很久了...'"
+                    else:
+                        # 普通成功结局
+                        ending = "normal_ending"
+                        boost = 10
+                        self.affection += boost  # 直接在内部更新，不返回delta
+                        message = "苏糖微笑着点了点头，'嗯，我也是...'"
+                    
+                    return {
+                        "success": True, 
+                        "message": message, 
+                        "ending": ending,
+                        "old_affection": old_affection,
+                        "new_affection": self.affection
+                    }
+                else:
+                    # 失败的情况
+                    penalty = -15 if self.affection < 50 else -8
+                    # 亲密度过低时会直接造成游戏结束
+                    if self.affection < 40:
+                        ending = "bad_ending"
+                        message = "苏糖看起来很尴尬，'对不起，我们还是..保持普通同学关系比较好...'"
+                        self.affection = 0  # 直接归零
+                    else:
+                        ending = "continue"
+                        message = "苏糖有些惊讶，'啊？这..有点突然...我们可以先多了解一下彼此吗？'"
+                        self.affection = max(0, self.affection + penalty)
+                    
+                    return {
+                        "success": False, 
+                        "message": message, 
+                        "ending": ending,
+                        "old_affection": old_affection,
+                        "new_affection": self.affection
+                    }
             else:
-                result["success"] = False
-                # 心情越差，惩罚越重
-                penalty = -30 if self.affection >=50 else -50
-                penalty *= (2 - mood_modifier)
-                self.affection = max(0, self.affection + penalty)
-                self.conversation_state["mood"] = max(0, self.conversation_state["mood"] - 20)
-                result["message"] = random.choice(self.config["rejection_phrases"])
+                # AI主动告白（当且仅当亲密度达到很高时）
+                return {"success": True, "message": "告白成功！", "ending": "special_ending"}
                 
-            return result
-        
-        # NPC主动表白（暂未实现）
-        return {"success": False}
-
-    @property
-    def current_phase(self):
-        """获取当前关系阶段"""
-        phases = [
-            (0, "Stranger"), 
-            (40, "Acquaintance"),
-            (70, "Friend"),
-            (90, "CloseFriend")
-        ]
-        for threshold, name in reversed(phases):
-            if self.affection >= threshold:
-                return Phase(threshold, name)
-        return Phase(0, "Unknown")
-
-    def _get_decay_factor(self):
-        """获取动态衰减系数"""
-        if len(self.phase_history) > 3:
-            same_phase_count = sum(1 for p in self.phase_history[-3:] 
-                                 if p == self.current_phase.name)
-            return 1.0 - same_phase_count * 0.15  # 减轻衰减幅度
-        return 1.0
-
-    def _update_phase(self):
-        """记录阶段变化"""
-        if not self.phase_history or self.phase_history[-1] != self.current_phase.name:
-            self.phase_history.append(self.current_phase.name)
+        elif event == AffectionEvent.SHARED_INTEREST:
+            # 发现共同兴趣的加成
+            boost = 5
+            old_value = self.affection
+            self.affection = min(100, self.affection + boost)
+            return {"delta": boost, "old_value": old_value, "new_value": self.affection}
+            
+        else:
+            # 其他事件的通用处理
+            old_value = self.affection
+            self.affection = max(0, min(100, self.affection + effect))
+            return {"delta": effect, "old_value": old_value, "new_value": self.affection}
 
     def check_ending(self):
-        """检查是否触发结局"""
+        """根据当前状态检查是否应该触发结局"""
         if self.affection <= 0:
             return "bad_ending"
         elif self.affection >= 100:
             return "good_ending"
-        return None
+        else:
+            return None
+
+    def _get_current_phase(self):
+        """获取当前的亲密度阶段"""
+        if self.affection < 30:
+            return "stranger"
+        elif self.affection < 50:
+            return "acquaintance"
+        elif self.affection < 75:
+            return "friend"
+        elif self.affection < 90:
+            return "close_friend"
+        else:
+            return "romantic"
 
 class Phase:
     def __init__(self, threshold, name):
