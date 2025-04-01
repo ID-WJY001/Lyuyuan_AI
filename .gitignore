@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual Environment
+.venv/
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+
+# IDE
+.vscode/
+.idea/
+
+# Configs & Sensitive Data
+config/
+affection_config*
+character.yaml
+userdict.txt
+
+# Generated Files
+saves/
+*.db
+*.json
+*.log
+
+# Temporary Files
+*.tmp
+*.bak
