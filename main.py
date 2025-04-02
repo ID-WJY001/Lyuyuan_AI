@@ -2,12 +2,11 @@ import yaml
 from Su_Tang import GalGameAgent
 import os
 import random
-from core.affection_system import AffectionSystem, AffectionEvent, SocialRisk
+from core.affection import AffectionSystem, AffectionEvent, SocialRisk
 from core.nlp_engine import NaturalLanguageProcessor
 from core.scene_manager import SceneManager
 import re
 from datetime import datetime, timedelta
-
 def load_config(path: str):
     with open(path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
@@ -133,8 +132,9 @@ class GameManager:
             "scene_change_delay": 0  # 场景转换延迟计数器
         }
         
-        # 同步初始好感度
-        self.affection.affection = self.game_state["closeness"]  # 设置为30
+        # 同步初始好感度到agent和affection系统
+        self.agent.game_state["closeness"] = self.game_state["closeness"]
+        self.affection.affection = float(self.game_state["closeness"])
         
     def process_dialogue(self, user_input, dialogue_history):
         """处理玩家输入并更新游戏状态"""
@@ -166,6 +166,8 @@ class GameManager:
             
         # 检查亲密度是否低于0，游戏结束
         if current_affection < 0:
+            self.game_state["closeness"] = 0  # 确保为0，避免负数
+            self.affection.affection = 0
             self.show_ending("好感度为负，关系破裂")
             return "😠 苏糖看起来非常生气，转身离开了...\n\n【游戏结束：好感度跌至谷底】"
         
@@ -179,6 +181,9 @@ class GameManager:
         # 生成亲密度变化信息
         affection_info = self._generate_affection_info(delta, previous_affection, current_affection, result)
         
+        # 确保在每次生成affection_info后，game_state中的closeness和last_affection是一致的
+        self.game_state["last_affection"] = self.game_state["closeness"] = int(current_affection)
+
         # 检查是否触发剧情
         triggered = self.check_storyline_triggers(current_affection)
         if triggered:
@@ -201,9 +206,27 @@ class GameManager:
             scene_transition = self.scene_manager.generate_scene_transition(
                 old_scene, self.current_scene, self.current_date, self.current_time
             )
+            
+            # 添加明确的系统消息，通知AI角色场景已转换
+            scene_change_notification = {
+                "role": "system", 
+                "content": f"场景已经转换：从「{old_scene}」转换到「{self.current_scene}」。"
+                           f"现在是{self.current_date.strftime('%Y年%m月%d日')} {self.current_time}。"
+                           f"请完全意识到这个场景变化，角色应当完全了解自己所处的新场景和时间。"
+                           f"不要将之前场景的对话内容错误地带入新场景中。"
+                           f"如果对话中提到了下一次活动的时间（如'周六'、'下周'等），请记住并在新场景中保持这个信息一致。"
+            }
+            self.agent.dialogue_history.append(scene_change_notification)
+            
+            # 在对话历史中添加场景转换标记
+            self.agent.dialogue_history.append({
+                "role": "system",
+                "content": f"===== 场景转换标记：{old_scene} -> {self.current_scene} ====="
+            })
+            
             reply = f"{reply}\n\n{scene_transition}"
             
-        # 检查是否触发特殊事件
+        # 检查是否触发事件
         if result.get('event'):
             event_result = self.handle_player_action(result['event'])
             if event_result:
@@ -220,6 +243,13 @@ class GameManager:
             if topic_tip:
                 reply = f"{reply}\n\n{topic_tip}"
             
+        # 对话处理后，将当前亲密度同步到agent状态中
+        self.agent.game_state["closeness"] = self.game_state["closeness"]
+        self.agent.game_state["last_affection"] = self.game_state["closeness"]
+        
+        # 确保亲密度值一致性
+        self.game_state["last_affection"] = self.game_state["closeness"]
+        
         return reply + affection_info
         
     def _generate_affection_info(self, delta, previous_affection, current_affection, result):
@@ -314,17 +344,41 @@ class GameManager:
         """处理玩家特殊行为，返回事件结果提示"""
         # 示例：玩家选择表白
         if action == AffectionEvent.CONFESSION:
-            result = self.affection.handle_event(
-                AffectionEvent.CONFESSION, 
-                is_player_initiated=True
-            )
+            # 根据当前好感度决定表白的结果
+            affection = self.affection.affection
+            if affection >= 95:
+                # 高好感度：接受表白
+                self.game_state["closeness"] = 100  # 设为最大值
+                self.affection.affection = 100
+                result = self.show_ending("告白成功")
+                self.affection.handle_event(AffectionEvent.CONFESSION, is_player_initiated=False)
+                return result
+            else:
+                # 低好感度：拒绝表白
+                # 根据当前好感度不同，产生不同程度的负面影响
+                if affection < 70:
+                    # 严重负面影响
+                    result = self.affection.handle_event(
+                        AffectionEvent.CONFESSION, 
+                        is_player_initiated=True,
+                        is_negative=True,
+                        is_severe=True
+                    )
+                else:
+                    # 轻微负面影响
+                    result = self.affection.handle_event(
+                        AffectionEvent.CONFESSION, 
+                        is_player_initiated=True,
+                        is_negative=True,
+                        is_severe=False
+                    )
             
             # 更新游戏状态中的亲密度
             if 'new_affection' in result:
                 self.game_state["closeness"] = int(result['new_affection'])
             
             if result.get("success"):
-                if result["ending"] == "good_ending":
+                if result.get("ending") == "good_ending":
                     self.show_ending("两人在烟火大会定情")
                     return "❤️ 表白成功！两人关系更进一步~"
                 else:
@@ -332,7 +386,7 @@ class GameManager:
             else:
                 if self.affection.check_ending() == "bad_ending":
                     self.show_ending("关系彻底破裂")
-                return f"💔 被拒绝了：{result['message']}"
+                return f"💔 被拒绝了：{result.get('message', '时机未到')}"
         
         # 共同兴趣
         elif action == AffectionEvent.SHARED_INTEREST:
@@ -359,7 +413,7 @@ class GameManager:
         # 不当言论
         elif action == AffectionEvent.INAPPROPRIATE:
             return "😡 你的言论十分不当！"
-            
+             
         return None
             
     def show_ending(self, description):
@@ -493,105 +547,40 @@ class GameManager:
                 
         return None
         
-    def _generate_scene_transition(self, old_scene, new_scene):
+    def _generate_scene_transition(self, scene_change):
         """生成场景转换的描述文本"""
-        # 获取日期格式
-        date_str = self.current_date.strftime("%Y年%m月%d日")
+        old_scene = self.current_scene
+        new_scene = scene_change["new_scene"]
+        old_date = self.current_date
+        new_date = scene_change["new_date"]
+        new_time = scene_change["new_time"]
         
-        # 根据时间生成不同的过渡语
-        time_transitions = {
-            "上午": [
-                f"在{date_str}的早晨，",
-                f"清晨的阳光洒在校园里，",
-                f"新的一天开始了，"
-            ],
-            "中午": [
-                f"到了{date_str}的中午，",
-                f"正午的阳光正盛，",
-                f"午休时间到了，"
-            ],
-            "下午": [
-                f"下午的{date_str}，",
-                f"午后温暖的阳光中，",
-                f"下午的时光里，"
-            ],
-            "傍晚": [
-                f"傍晚的{date_str}，",
-                f"夕阳西下时分，",
-                f"天色渐暗，"
-            ],
-            "晚上": [
-                f"夜幕降临的{date_str}，",
-                f"华灯初上，",
-                f"夜晚的校园里，"
-            ]
-        }
+        # 是否有日期变化
+        date_changed = old_date.day != new_date.day or old_date.month != new_date.month
         
-        # 选择对应时间的过渡语
-        time_transition = random.choice(time_transitions[self.current_time])
+        # 根据不同情况生成转场描述
+        if date_changed:
+            # 跨天场景转换
+            if (new_date - old_date).days == 1:
+                prefix = f"第二天（{new_date.strftime('%Y年%m月%d日')}），{new_time}。"
+            else:
+                prefix = f"几天后（{new_date.strftime('%Y年%m月%d日')}），{new_time}。"
+        else:
+            # 同一天不同时间段
+            prefix = f"不久后，{new_time}。"
+            
+        # 从场景描述列表中随机选择一个描述
+        if new_scene in self.scene_manager.scene_descriptions:
+            scene_desc = random.choice(self.scene_manager.scene_descriptions[new_scene])
+        else:
+            scene_desc = f"你来到了{new_scene}。"
+            
+        # 添加特殊的系统提示，通知AI场景已转换
+        scene_change_notification = {"role": "system", "content": f"场景已经转换：从「{old_scene}」转换到「{new_scene}」。现在是{new_date.strftime('%Y年%m月%d日')} {new_time}。请在接下来的回复中自然地反映这一场景变化，不要直接提及场景转换本身。"}
+        self.agent.dialogue_history.append(scene_change_notification)
         
-        # 场景描述保持不变...
-        scene_descriptions = {
-            "烘焙社摊位": [
-                "百团大战的会场中，烘焙社的摊位前摆放着各种精致的点心样品，苏糖站在摊位后面，微笑着向过往的学生介绍着社团活动。",
-                "烘焙社的摊位装饰得十分精美，展示柜里陈列着各式各样的甜点作品，苏糖正在为一些感兴趣的同学演示简单的裱花技巧。",
-                "烘焙社的展台前围着不少女生，苏糖正在耐心地解答大家关于烘焙的问题，看到你走近，她露出了礼貌的微笑。"
-            ],
-            "烘焙社": [
-                "烘焙社的活动室内，几个烤箱整齐地排列在一边，中间是宽敞的操作台，苏糖正在准备今天的活动材料。",
-                "阳光透过窗户照进烘焙社的活动室，空气中弥漫着黄油和香草的甜美气息，苏糖看到你来了，笑着招呼你过去。",
-                "烘焙社的活动室里，几位社员正在认真地揉面团，苏糖作为社长，正在巡视指导，看到你进来，她停下脚步向你点头示意。"
-            ],
-            "教室": [
-                "阳光透过窗户洒在教室的地板上，苏糖已经坐在座位上翻看着笔记。",
-                "教室里人声嘈杂，苏糖正靠在窗边看着窗外的风景。",
-                "下课铃声刚响，教室里的同学们三三两两地聊着天，苏糖向你招了招手。"
-            ],
-            "操场": [
-                "操场上人不多，苏糖穿着运动服正在跑道上慢跑，看到你后停了下来。",
-                "阳光明媚，操场的草坪上，苏糖正坐在树荫下看书。",
-                "傍晚的操场，余晖染红了天边的云彩，苏糖靠在栏杆上等着你。"
-            ],
-            "图书馆": [
-                "图书馆的角落里，苏糖正专注地翻阅着一本书，发现你来了后露出微笑。",
-                "安静的图书馆中，阳光透过玻璃窗照在书架上，苏糖正在寻找着什么书。",
-                "图书馆的自习区，苏糖早已占好了两个位置，看到你来了轻轻挥手。"
-            ],
-            "公园": [
-                "公园的樱花盛开，苏糖站在樱花树下，粉色的花瓣衬着她的笑容。",
-                "湖边的长椅上，苏糖看着平静的水面，微风拂过她的发丝。",
-                "公园的小路上，苏糖看到你后小跑着迎了上来。"
-            ],
-            "食堂": [
-                "食堂里人声鼎沸，苏糖已经占好了座位，正向你招手。",
-                "午餐时间的食堂里，阳光透过窗户照在苏糖的餐盘上，她正在等你。",
-                "食堂的角落里，苏糖选了一个安静的位置，桌上已经摆好了两份餐食。"
-            ],
-            "街道": [
-                "放学的街道上，夕阳将苏糖的影子拉得很长，她正靠在路灯旁等你。",
-                "熙熙攘攘的街道上，苏糖在一家甜品店前停下脚步，转头看到了你。",
-                "街角的面包店前，苏糖正透过橱窗看着里面的糕点，听到脚步声回头看到了你。"
-            ],
-            "游乐场": [
-                "游乐场的入口处，苏糖穿着休闲的衣服，看起来十分期待今天的约会。",
-                "旋转木马旁，苏糖正看着这些色彩斑斓的骏马，听到你的声音后转过身。",
-                "游乐场中央的喷泉旁，苏糖正在等你，脸上挂着灿烂的笑容。"
-            ],
-            "电影院": [
-                "电影院的大厅里，苏糖正在查看着电影海报，看到你后微笑着走了过来。",
-                "电影院门口，苏糖手里拿着两张电影票，见到你后笑着晃了晃。",
-                "影院的休息区，苏糖坐在沙发上玩着手机，抬头看到你后站了起来。"
-            ],
-            "咖啡厅": [
-                "咖啡厅的落地窗旁，苏糖面前放着一杯冒着热气的饮品，窗外的阳光洒在她的侧脸上。",
-                "安静的咖啡厅里，苏糖正在翻看一本书，听到铃声抬头看到了你。",
-                "咖啡厅的角落里，苏糖已经点好了两杯咖啡，看到你推门而入后向你招手。"
-            ]
-        }
-        
-        scene_description = random.choice(scene_descriptions.get(new_scene, ["你来到了新的地点，看到了苏糖。"]))
-        
-        return f"【场景转换：{old_scene} → {new_scene}】\n\n{time_transition}{scene_description}"
+        # 返回完整的场景转换描述
+        return f"\n[场景转换]\n{prefix} {scene_desc}"
 
     def _get_available_topics(self, affection):
         """根据亲密度获取可用话题"""
@@ -666,11 +655,50 @@ def main():
                     print("游戏已退出")
                     break
                 elif user_input == "/save":
+                    # 在保存前，确保将当前亲密度值同步到agent的game_state中
+                    game.agent.game_state["closeness"] = game.game_state["closeness"]
+                    
+                    # 同时保存当前日期和时间信息
+                    game.agent.game_state["date"] = game.current_date
+                    game.agent.game_state["time_period"] = game.current_time
+                    game.agent.game_state["scene"] = game.current_scene
+                    
                     game.agent.save(1)
                     print("手动存档成功！")
                     continue
                 elif user_input == "/load":
                     game.agent.load(1)
+                    # 加载后，将agent中的亲密度值同步到游戏状态和affection系统中
+                    game.game_state["closeness"] = game.agent.game_state["closeness"]
+                    game.affection.affection = float(game.game_state["closeness"])
+                    
+                    # 加载日期和场景数据
+                    if "date" in game.agent.game_state and game.agent.game_state["date"]:
+                        try:
+                            # 如果是字符串格式，则转换为datetime对象
+                            if isinstance(game.agent.game_state["date"], str):
+                                import datetime as dt
+                                game.current_date = dt.datetime.strptime(game.agent.game_state["date"], "%Y-%m-%d")
+                            else:
+                                game.current_date = game.agent.game_state["date"]
+                        except:
+                            # 如果加载失败，保持当前日期
+                            pass
+                    
+                    # 加载时间段
+                    if "time_period" in game.agent.game_state and game.agent.game_state["time_period"]:
+                        game.current_time = game.agent.game_state["time_period"]
+                        try:
+                            game.time_period_index = game.time_periods.index(game.current_time)
+                        except:
+                            # 如果时间段不在列表中，设为默认值
+                            game.current_time = "上午"
+                            game.time_period_index = 0
+                    
+                    # 加载场景信息
+                    if "scene" in game.agent.game_state and game.agent.game_state["scene"]:
+                        game.current_scene = game.agent.game_state["scene"]
+                    
                     print("读取存档成功！")
                     print(f"\n[当前时间：{game.current_date.strftime('%Y年%m月%d日')} {game.current_time}]")
                     print(f"\n[当前亲密度：{game.game_state['closeness']}]")
@@ -702,6 +730,13 @@ def main():
                 reply = game.process_dialogue(user_input, game.agent.dialogue_history)
                 print("\n苏糖：", reply)
                 
+                # 对话处理后，将当前亲密度同步到agent状态中
+                game.agent.game_state["closeness"] = game.game_state["closeness"]
+                game.agent.game_state["last_affection"] = game.game_state["closeness"]
+                
+                # 确保亲密度值一致性
+                game.game_state["last_affection"] = game.game_state["closeness"]
+                
                 # 显示状态（移至process_dialogue返回值的一部分）
                 if not game.debug_mode:
                     print(f"\n[当前时间：{game.current_date.strftime('%Y年%m月%d日')} {game.current_time}]")
@@ -710,6 +745,10 @@ def main():
                 # 优雅处理对话过程中的错误
                 print(f"\n游戏处理错误: {str(e)}")
                 print("\n苏糖：（似乎遇到了一些问题，但她很快调整好情绪）抱歉，我刚才走神了。你刚才说什么？")
+                
+                # 即使发生错误，也确保亲密度同步
+                game.agent.game_state["closeness"] = game.game_state["closeness"]
+                
                 print(f"\n[当前时间：{game.current_date.strftime('%Y年%m月%d日')} {game.current_time}]")
                 print(f"\n[当前亲密度：{game.game_state['closeness']}]")
             

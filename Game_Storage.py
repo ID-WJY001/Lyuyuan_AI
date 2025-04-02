@@ -17,6 +17,10 @@ class GameStorage:
             "version": "1.0"
         }
         
+        # 处理日期时间对象
+        if "state" in data and "date" in data["state"] and isinstance(data["state"]["date"], datetime):
+            data["state"]["date"] = data["state"]["date"].strftime("%Y-%m-%d")
+        
         try:
             with open(self._get_filepath(slot), 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)

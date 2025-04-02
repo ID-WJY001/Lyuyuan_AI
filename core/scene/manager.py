@@ -1,9 +1,3 @@
-# scene_manager.py - 兼容层
-from core.scene import SceneManager
-
-# 重新导出所有实体以保持向后兼容性
-__all__ = ['SceneManager']
-
 from datetime import datetime, timedelta
 import random
 import re
@@ -208,7 +202,7 @@ class SceneManager:
             return current_date + timedelta(days=1)
         elif "周末" in time_keyword:
             days_until_weekend = (5 - current_date.weekday()) % 7
-            if days_until_weekend == 0 and self.current_time == "晚上":
+            if days_until_weekend == 0:
                 days_until_weekend = 7
             return current_date + timedelta(days=days_until_weekend)
         elif "下次" in time_keyword or "再见面" in time_keyword:
@@ -268,48 +262,45 @@ class SceneManager:
         # 选择一个场景描述
         scene_description = random.choice(self.scene_descriptions.get(new_scene, ["你来到了新的地点。"]))
         
-        # 场景转换描述
-        scene_transitions = {
-            "烘焙社摊位": {
-                "烘焙社": [
-                    "在了解完社团活动后，苏糖邀请你参观烘焙社的活动室。",
-                    "听完介绍，苏糖热情地邀请你去烘焙社的活动室看看。",
-                    "介绍完社团情况，苏糖笑着说要带你去烘焙社的活动室参观。"
-                ]
-            },
-            "烘焙社": {
-                "教室": [
-                    "社团活动结束后，你们一起走向教室。",
-                    "参观完烘焙社，苏糖提议一起去教室。",
-                    "了解完烘焙社的情况，你们一起往教室走去。"
-                ]
-            }
-        }
-        
-        # 获取场景转换描述
-        transition_desc = ""
-        if old_scene in scene_transitions and new_scene in scene_transitions[old_scene]:
-            transition_desc = random.choice(scene_transitions[old_scene][new_scene])
-        
-        # 组合完整的场景转换描述
-        if transition_desc:
-            formatted_transition = f"\n【场景转换 - {date_str} {current_time} - {new_scene}】\n{transition_desc}\n\n{time_intro}{scene_description}"
+        # 根据场景变化程度生成不同的过渡文本
+        if old_scene == new_scene:
+            transition = f"【{current_time} - {new_scene}】\n{time_intro}你们依然在{new_scene}。{scene_description}"
         else:
-            formatted_transition = f"\n【场景转换 - {date_str} {current_time} - {new_scene}】\n{time_intro}{scene_description}"
+            transition = f"【{current_time} - {new_scene}】\n{time_intro}你来到了{new_scene}。{scene_description}"
+            
+        return transition
         
-        return formatted_transition
-
     def _should_delay_scene_change(self, user_input, ai_reply):
-        """判断是否需要延迟场景转换"""
-        # 检查是否正在进行重要对话
+        """判断是否应该延迟场景转换（例如，对话中有明确的问答需要完成）"""
+        # 检查是否有关键对话正在进行
         important_keywords = [
-            "报名", "申请表", "谢谢", "再见", "拜拜",
-            "好的", "知道了", "明白了", "没问题",
-            "了解", "介绍", "活动", "社团", "加入"
+            "报名", "申请表", "填表", "填写", "活动", "社团", "加入", 
+            "招新", "什么时候", "几点", "周几", "什么地方", "在哪里",
+            "明白", "知道了", "听懂", "记得", "记住", "了解"
         ]
         
+        # 如果AI回复中包含问题，延迟场景转换，等待用户回答
+        if "?" in ai_reply or "？" in ai_reply:
+            return True
+        
+        # 如果当前对话中包含重要关键词，延迟场景转换
         for keyword in important_keywords:
             if keyword in user_input or keyword in ai_reply:
                 return True
-                
+        
+        # 如果用户提问但AI还没完全回答，延迟场景转换
+        if ("?" in user_input or "？" in user_input) and len(ai_reply) < 50:
+            return True
+        
+        # 如果回复中提到特定的日期或时间，但场景转换没有对应，延迟场景转换
+        time_specific_patterns = [
+            r"周[一二三四五六日]", r"下周", r"明天", r"后天", r"这周[一二三四五六日]", 
+            r"上午", r"中午", r"下午", r"傍晚", r"晚上", r"[0-9]+点", r"[0-9]+:[0-9]+"
+        ]
+        
+        for pattern in time_specific_patterns:
+            if re.search(pattern, ai_reply):
+                # 如果回复中提到具体时间，但是即将发生的场景转换没有反映这个时间，则延迟
+                return True
+            
         return False 

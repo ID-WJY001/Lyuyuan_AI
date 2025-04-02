@@ -2,6 +2,7 @@
 from Game_Storage import GameStorage
 from openai import OpenAI
 import os
+import random
 
 # 加载角色设定（替换为之前制作的苏糖prompt）
 with open("sutang_prompt.txt", encoding='utf-8') as f:
@@ -18,9 +19,19 @@ CHARACTER_DETAILS = """
 兴趣爱好：烘焙、阅读、听音乐
 社团：烘焙社社长
 
+【家庭背景】
+家庭情况：独生女，家庭和睦美满
+父亲：上市公司高管
+母亲：大学老师
+
 【背景信息】
 当前场景：绿园中学百团大战活动，苏糖正在烘焙社摊位前介绍社团活动
 互动对象：陈辰（男，高一一班学生）
+
+【重要提示】
+1. 请严格遵守角色设定，不要添加任何未在设定中明确提及的背景信息
+2. 关于苏糖的家庭情况，请仅限于已提供的信息：独生女，父亲是上市公司高管，母亲是大学老师，家庭和睦美满
+3. 如果被问到设定中未提及的内容，应该以合理但模糊的方式回应，而不是编造具体细节
 
 请你始终牢记以上设定，在回复中保持角色一致性，任何时候都不要忘记自己是谁、在哪里、和谁说话。
 """
@@ -81,7 +92,7 @@ class GalGameAgent:
         elif closeness < 80:
             guidelines.append("当前亲密度较高，你已经把陈辰当作朋友，会更加开放地表达自己，分享自己的兴趣爱好。")
         else:
-            guidelines.append("当前亲密度很高，你对陈辰有好感，会表现得更加亲近，甚至有些害羞的暗示。")
+            guidelines.append("当前亲密度很高(>80)，处于亲密期，对陈辰有明显好感。你会对他非常亲切，会有身体上的小接触(如碰手臂、整理衣领等)，会对他撒娇，主动邀请他参加活动，表现得更加害羞和在意他的反应。你应特别期待与他独处的机会。")
         
         # 动态调整无聊程度
         boredom = self.game_state.get("boredom_level", 0)
@@ -138,6 +149,9 @@ class GalGameAgent:
         # 确保系统提示保留角色设定
         enhanced_prompt = CHARACTER_PROMPT + "\n\n" + CHARACTER_DETAILS
         
+        # 每5轮对话添加一次设定提醒，确保角色不会偏离设定
+        reminder_message = {"role": "system", "content": "提醒：严格遵守苏糖的角色设定，包括她的家庭背景：独生女，父亲是上市公司高管，母亲是大学老师，家庭和睦美满。请不要添加或编造原设定中没有的信息。"}
+        
         # 检查历史中是否已有系统消息
         system_messages = [msg for msg in self.dialogue_history if msg["role"] == "system"]
         
@@ -188,7 +202,7 @@ class GalGameAgent:
         
         # 每5个回合强制重申一次角色设定，确保角色不会忘记自己的身份
         if len([msg for msg in self.dialogue_history if msg["role"] == "user"]) % 5 == 0:
-            reminder = {"role": "system", "content": "提醒：你是苏糖，高一二班的学生，烘焙社社长。你正在和高一一班的陈辰交谈。保持角色设定的一致性，不要忘记自己的身份和背景。"}
+            reminder = {"role": "system", "content": "提醒：你是苏糖，高一二班的学生，烘焙社社长。你正在和高一一班的陈辰交谈。你是独生女，父亲是上市公司高管，母亲是大学老师，家庭和睦美满。保持角色设定的一致性，不要忘记自己的身份和背景。"}
             self.dialogue_history.append(reminder)
         
         # 创建对话引擎并处理可能的连接错误
@@ -221,7 +235,14 @@ class GalGameAgent:
             elif closeness < 70:
                 reply = "（友好地笑了笑）谢谢你这么说。我很喜欢烘焙，从小就对甜点特别感兴趣。你呢，你平时有什么爱好吗？"
             else:
-                reply = "（眼睛亮了起来）真的吗？我也觉得我们有很多共同话题！我平时除了烘焙，还喜欢听音乐和阅读。很高兴能和你聊这么多。"
+                # 高好感度(>70)亲密期回复
+                replies = [
+                    "（脸上泛起微微的红晕）我们认识这么久了，我发现和你聊天真的很开心呢~（轻轻碰了碰你的手臂）下次我做了新点心，第一个尝的一定是你！",
+                    "（笑容特别明亮）陈辰，你知道吗？我妈妈说我最近总是提起你。（害羞地低头）我想...这周末有个钢琴演奏会，你要不要一起去啊？",
+                    "（自然地整理了一下你的衣领）你今天看起来很精神呢~（眼睛亮亮的）对了，我给糖豆拍了好多新照片，要看看吗？",
+                    "（靠近你些，小声说）其实这个配方我改良了好多次...（抬头看你的眼睛）不过为了你，我愿意分享我的小秘密啦~"
+                ]
+                reply = random.choice(replies)
         
         # 添加到对话历史
         self.dialogue_history.append({"role": "assistant", "content": reply})
@@ -236,6 +257,10 @@ class GalGameAgent:
         return reply
     
     def save(self, slot):
+        # 确保closeness以数值形式存储，而不是字符串
+        if "closeness" in self.game_state:
+            self.game_state["closeness"] = int(self.game_state["closeness"])
+            
         data = {
             "history": self.dialogue_history,
             "state": self.game_state
@@ -247,6 +272,11 @@ class GalGameAgent:
         if data:
             self.dialogue_history = data["history"]
             self.game_state = data["state"]
+            
+            # 确保亲密度值是整数类型
+            if "closeness" in self.game_state:
+                self.game_state["closeness"] = int(self.game_state["closeness"])
+                
             # 确保游戏状态包含所有必要字段
             if "last_topics" not in self.game_state:
                 self.game_state["last_topics"] = []
