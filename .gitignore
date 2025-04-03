@@ -28,3 +28,5 @@ saves/
 # Temporary Files
 *.tmp
 *.bak
+
+.env

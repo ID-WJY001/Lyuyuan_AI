@@ -1,0 +1,146 @@
+/* 全局样式 */
+body {
+    font-family: 'ZCOOL XiaoWei', serif;
+    background: linear-gradient(135deg, #f5f8fa 0%, #e8f0f5 50%, #d9e8f2 100%);
+    color: #333;
+    min-height: 100vh; /* 确保背景覆盖整个视口高度 */
+}
+
+.game-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px;
+}
+
+.game-title {
+    font-family: 'ZCOOL QingKe HuangYou', cursive;
+    color: #2c3e50;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+}
+
+.game-content {
+    background-color: rgba(255, 255, 255, 0.85);
+    border-radius: 15px;
+    padding: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+    margin-bottom: 10px;
+    border: 1px solid rgba(200, 220, 240, 0.5); /* 添加浅色边框 */
+}
+
+/* 角色样式 */
+.character-image {
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* 对话消息样式 */
+.chat-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+    background: #a0c0d0; /* 滚动条颜色与主题匹配 */
+    border-radius: 10px;
+}
+
+.chat-container::-webkit-scrollbar-thumb:hover {
+    background: #7eadbd;
+}
+
+.system-message {
+    font-style: italic;
+    color: #6c757d;
+    text-align: center;
+    margin: 8px 0;
+    padding: 5px;
+}
+
+/* 好感度进度条样式 */
+.progress-bar {
+    transition: width 0.5s ease;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+    from { transform: translateX(-50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease forwards;
+}
+
+.assistant-message {
+    animation: slideInRight 0.3s ease forwards;
+}
+
+.user-message {
+    animation: slideInLeft 0.3s ease forwards;
+}
+
+/* 按钮样式 */
+.btn {
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+.btn-success {
+    background-color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+.btn-success:hover {
+    background-color: #27ae60;
+    border-color: #27ae60;
+}
+
+/* 调整页脚 */
+footer {
+    margin-top: 5px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .character-container {
+        height: 200px;
+    }
+    
+    .character-image {
+        max-height: 200px;
+        max-width: 65%;
+    }
+    
+    .chat-container {
+        height: 300px;
+    }
+} 

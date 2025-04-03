@@ -31,7 +31,6 @@ CHARACTER_DETAILS = """
 【重要提示】
 1. 请严格遵守角色设定，不要添加任何未在设定中明确提及的背景信息
 2. 关于苏糖的家庭情况，请仅限于已提供的信息：独生女，父亲是上市公司高管，母亲是大学老师，家庭和睦美满
-3. 如果被问到设定中未提及的内容，应该以合理但模糊的方式回应，而不是编造具体细节
 
 请你始终牢记以上设定，在回复中保持角色一致性，任何时候都不要忘记自己是谁、在哪里、和谁说话。
 """
@@ -209,8 +208,8 @@ class GalGameAgent:
         try:
             # 使用DeepSeek API
             client = OpenAI(
-                api_key=os.environ.get("DEEPSEEK_API_KEY", ""),
-                base_url="https://api.deepseek.com/v1"  # 添加DeepSeek的API基础URL
+                api_key=os.environ.get("DEEPSEEK_API_KEY", "your-deepseek-api-key"),  # 替换为实际API密钥
+                base_url="https://api.deepseek.com/v1"  # DeepSeek的API基础URL
             )
             response = client.chat.completions.create(
                 model="deepseek-chat", 
