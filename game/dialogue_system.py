@@ -4,8 +4,14 @@
 """
 
 import random
+import os
+import json
+import sys
 import re
-from core.affection import AffectionEvent, SocialRisk
+import logging
+
+# 导入核心组件 - 更新导入路径
+from core import AffectionEvent, SocialRisk
 
 class DialogueSystem:
     def __init__(self, game_manager):

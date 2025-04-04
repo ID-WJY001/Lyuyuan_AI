@@ -6,7 +6,9 @@
 import os
 import random
 import logging
-from game.game_manager import GameManager
+import json
+from datetime import datetime
+from game.managers import GameManager
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, 
@@ -28,7 +30,7 @@ def print_game_introduction():
     print("  - 保持礼貌，让对话有趣且有深度")
     print("  - 好感度降至0以下游戏结束")
     print("  - 好感度达到100时会有特殊剧情")
-    print("\n命令提示: /exit退出, /save保存, /load读取, /debug调试模式, /status查看社交状态, /time查看当前时间")
+    print("\n命令提示: /exit退出, /save保存, /load读取, /debug调试模式, /status查看社交状态, /help查看帮助")
 
 def handle_command(command, game):
     """处理用户命令"""
@@ -37,9 +39,9 @@ def handle_command(command, game):
         return True
     elif command == "/save":
         # 同步其他游戏状态到agent
-        game.agent.game_state["date"] = game.current_date
+        game.agent.game_state["scene"] = game.scene_manager.current_scene
+        game.agent.game_state["date"] = datetime.now().strftime("%Y年%m月%d日")
         game.agent.game_state["time_period"] = game.current_time
-        game.agent.game_state["scene"] = game.current_scene
         
         game.agent.save(1)
         print("手动存档成功！")
@@ -51,34 +53,16 @@ def handle_command(command, game):
             
             # 更新好感度
             if "closeness" in loaded_state:
-                game.affection_manager.update_value(loaded_state["closeness"], source="load_game")
+                game.affection_manager.update_value(loaded_state["closeness"], source="load")
             
             # 更新游戏状态
-            if "date" in loaded_state:
-                from datetime import datetime
-                if isinstance(loaded_state["date"], str):
-                    try:
-                        game.current_date = datetime.strptime(loaded_state["date"], "%Y-%m-%d")
-                    except ValueError:
-                        game.current_date = datetime.now()
-                else:
-                    game.current_date = loaded_state["date"]
-                    
-            if "time_period" in loaded_state:
-                game.current_time = loaded_state["time_period"]
-                try:
-                    game.time_period_index = game.time_periods.index(game.current_time)
-                except ValueError:
-                    game.time_period_index = 0
-                    
             if "scene" in loaded_state:
-                game.current_scene = loaded_state["scene"]
+                game.scene_manager.current_scene = loaded_state["scene"]
                 
             print("读取存档成功！")
             
             # 显示当前状态
-            affection = int(game.affection_manager.get_value())
-            print(f"\n[当前时间：{game.current_date.strftime('%Y年%m月%d日')} {game.current_time}]")
+            affection = int(game.game_state["closeness"])
             print(f"\n[当前亲密度：{affection}]")
         else:
             print("没有找到存档或存档损坏！")
@@ -125,9 +109,9 @@ def game_loop(game):
                     
                     # 自动保存功能
                     if random.random() < 0.2:  # 20%概率自动保存
-                        game.agent.game_state["date"] = game.current_date
+                        game.agent.game_state["scene"] = game.scene_manager.current_scene
+                        game.agent.game_state["date"] = datetime.now().strftime("%Y年%m月%d日")
                         game.agent.game_state["time_period"] = game.current_time
-                        game.agent.game_state["scene"] = game.current_scene
                         game.agent.save(0)  # 自动保存到槽位0
                     
                     # 显示状态
@@ -158,23 +142,36 @@ def game_loop(game):
         logger.critical(f"游戏主循环崩溃: {str(e)}", exc_info=True)
         print(f"游戏发生严重错误，请查看日志: {str(e)}")
 
-def setup_api_key():
-    """设置API密钥"""
+def setup_environment():
+    """设置环境变量和API密钥"""
     try:
-        # 在实际应用中，应该从环境变量或配置文件中加载API密钥
-        api_key = "YOUR_API_KEY_HERE"  # 替换为实际的API密钥
-        os.environ["DEEPSEEK_API_KEY"] = api_key
-        logger.info("API密钥设置成功")
+        # 加载环境变量
+        from utils.common import load_env_file
+        load_env_file()
+        logger.info("环境变量加载成功")
     except Exception as e:
-        logger.warning(f"API密钥设置错误: {str(e)}")
-        print(f"API密钥设置错误: {str(e)}")
-        print("游戏将继续，但可能无法获取在线响应。")
+        logger.warning(f"环境变量加载错误: {str(e)}")
+        print(f"环境变量加载错误: {str(e)}")
+        print("游戏将继续，但可能需要手动设置环境变量。")
+
+def ensure_save_directory():
+    """确保存档目录存在"""
+    try:
+        os.makedirs("saves", exist_ok=True)
+        logger.info("存档目录准备完成")
+    except Exception as e:
+        logger.warning(f"创建存档目录失败: {str(e)}")
+        print(f"创建存档目录失败: {str(e)}")
+        print("游戏将继续，但可能无法保存游戏进度。")
 
 def main():
     """游戏主函数"""
     try:
-        # 设置API密钥
-        setup_api_key()
+        # 设置环境变量
+        setup_environment()
+        
+        # 确保存档目录
+        ensure_save_directory()
         
         # 初始化游戏管理器
         logger.info("初始化游戏...")

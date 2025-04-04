@@ -36,6 +36,26 @@ class AffectionSystem:
         self.social_balance = 50   # 社交平衡度(0-100)，影响整体评价
         self.difficulty_factor = 1.2  # 难度系数，降低为1.2（原来是1.8）
         self.debug_mode = False  # 调试模式开关
+        
+        # 注册的系统列表
+        self.registered_systems = []
+
+    def register_system(self, system):
+        """注册一个子系统到亲密度管理器"""
+        if system not in self.registered_systems:
+            self.registered_systems.append(system)
+            return True
+        return False
+            
+    def update_value(self, new_value):
+        """更新亲密度值并同步到所有注册的系统"""
+        if new_value != self.affection:
+            self.affection = max(0, min(100, new_value))
+            # 同步到注册的系统
+            for system in self.registered_systems:
+                if hasattr(system, 'update_affection'):
+                    system.update_affection(self.affection)
+        return self.affection
 
     def process_dialogue(self, user_input, dialogue_history):
         """处理对话并更新亲密度"""

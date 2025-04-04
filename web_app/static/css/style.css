@@ -65,7 +65,7 @@ body {
 
 /* 好感度进度条样式 */
 .progress-bar {
-    transition: width 0.5s ease;
+    transition: none !important; /* 禁用Bootstrap默认的transition */
 }
 
 /* 动画效果 */

@@ -1,5 +1,17 @@
+"""
+角色工厂模块
+负责创建和管理游戏中的角色
+"""
+
 import yaml
 import os
+import sys
+import logging
+
+# 添加项目根目录到路径以便导入
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(ROOT_DIR)
+
 from Su_Tang import GalGameAgent
 
 class CharacterFactory:
@@ -15,7 +27,8 @@ class CharacterFactory:
         """
         self.characters = {}  # 存储已创建的角色实例
         self.character_configs = {}  # 存储角色配置
-        self.root_dir = os.path.dirname(os.path.abspath(__file__))  # 项目根目录
+        self.root_dir = ROOT_DIR  # 项目根目录
+        self.logger = logging.getLogger("CharacterFactory")
         self.load_character_configs()  # 加载所有角色配置
         
     def load_character_configs(self):
@@ -38,8 +51,9 @@ class CharacterFactory:
                 with open(os.path.join(config_dir, file), 'r', encoding='utf-8') as f:
                     try:
                         self.character_configs[character_id] = yaml.safe_load(f)
+                        self.logger.info(f"已加载角色配置: {character_id}")
                     except Exception as e:
-                        print(f"加载角色配置失败: {file}, 错误: {e}")
+                        self.logger.error(f"加载角色配置失败: {file}, 错误: {e}")
     
     def _setup_default_character(self):
         """
@@ -67,6 +81,8 @@ class CharacterFactory:
             # 保存到新位置
             with open(target_path, 'w', encoding='utf-8') as f:
                 yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+                
+            self.logger.info(f"已创建默认角色配置: {target_path}")
     
     def get_character(self, character_id, load_slot=None, is_new_game=False):
         """
@@ -92,6 +108,7 @@ class CharacterFactory:
                 self.characters[character_id] = character
                 return character
             else:
+                self.logger.error(f"找不到角色配置: {character_id}")
                 raise ValueError(f"找不到角色配置: {character_id}")
         
         # 根据配置创建新角色
@@ -106,6 +123,7 @@ class CharacterFactory:
             character = self._create_generic_character(config, load_slot, is_new_game)
         
         self.characters[character_id] = character
+        self.logger.info(f"已创建角色实例: {character_id}")
         return character
     
     def _create_generic_character(self, config, load_slot=None, is_new_game=False):
@@ -202,16 +220,20 @@ class CharacterFactory:
         参数:
             character_id: 角色ID
         返回值:
-            包含角色基本信息的字典，如果角色不存在则返回None
+            包含角色基本信息的字典
+        抛出:
+            ValueError: 找不到指定角色配置时
         """
         if character_id not in self.character_configs:
-            return None
-            
+            self.logger.error(f"找不到角色配置: {character_id}")
+            raise ValueError(f"找不到角色配置: {character_id}")
+        
         config = self.character_configs[character_id]
         return {
             'id': character_id,
-            'name': config.get('name', 'Unknown'),
-            'display_name': config.get('display_name', config.get('name', 'Unknown')),
+            'name': config.get('name', ''),
+            'display_name': config.get('display_name', ''),
             'description': config.get('description', ''),
-            'avatar': config.get('avatar', None)
+            'icon': config.get('icon', None),
+            'unlocked': True  # 目前所有角色都是解锁的，后续可添加解锁逻辑
         } 

@@ -4,13 +4,13 @@
 <style>
     .character-container {
         position: relative;
-        height: 320px;
+        height: 380px;
         text-align: center;
         margin-bottom: 10px;
     }
     
     .character-image {
-        max-height: 320px;
+        max-height: 380px;
         max-width: 85%;
         transition: all 0.5s ease;
     }
@@ -54,6 +54,9 @@
         border-radius: 10px;
         background-color: rgba(255, 255, 255, 0.85);
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        height: calc(100% - 390px);
+        display: flex;
+        flex-direction: column;
     }
     
     .progress {
@@ -157,11 +160,6 @@
                 <div class="col-4">场景:</div>
                 <div class="col-8" id="scene-info">学校 - 百团大战</div>
             </div>
-            
-            <div class="d-grid gap-2 mt-2">
-                <button id="save-game" class="btn btn-primary btn-sm">保存游戏</button>
-                <button id="load-game" class="btn btn-secondary btn-sm">加载游戏</button>
-            </div>
         </div>
     </div>
     
@@ -193,57 +191,6 @@
     
     <div>
         <button id="start-game" class="btn btn-success game-button">开始游戏</button>
-        <button id="load-saved-game" class="btn btn-primary game-button">加载存档</button>
-    </div>
-</div>
-
-<!-- 保存游戏对话框 -->
-<div class="modal fade" id="save-modal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="saveModalLabel">保存游戏</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="save-slot" class="form-label">选择存档位置</label>
-                    <select class="form-select" id="save-slot">
-                        <option value="1">存档 1</option>
-                        <option value="2">存档 2</option>
-                        <option value="3">存档 3</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" id="confirm-save">保存</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 加载游戏对话框 -->
-<div class="modal fade" id="load-modal" tabindex="-1" aria-labelledby="loadModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="loadModalLabel">加载游戏</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="load-slot" class="form-label">选择存档</label>
-                    <select class="form-select" id="load-slot">
-                        <!-- 存档选项将通过AJAX动态加载 -->
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" id="confirm-load">加载</button>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}

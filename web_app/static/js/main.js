@@ -17,20 +17,40 @@ const gameState = {
 $(document).ready(function() {
     // 绑定按钮事件
     $("#start-game").click(startGame);
-    $("#load-saved-game").click(showLoadGameModal);
     $("#send-button").click(sendMessage);
     $("#user-input").keypress(function(e) {
         if (e.which === 13) { // Enter键
             sendMessage();
         }
     });
-    $("#save-game").click(showSaveGameModal);
-    $("#load-game").click(showLoadGameModal);
-    $("#confirm-save").click(saveGame);
-    $("#confirm-load").click(loadGame);
     
     // 初始化提示
     console.log("绿园中学物语：追女生模拟 - Web版本已加载");
+    
+    // 开始游戏按钮点击事件
+    $("#start-btn").click(startGame);
+    
+    // 发送消息按钮点击事件
+    $("#send-btn").click(sendMessage);
+    
+    // 输入框回车键发送消息
+    $("#message-input").keypress(function(e) {
+        if (e.which === 13) {
+            sendMessage();
+            return false;
+        }
+    });
+    
+    // 窗口大小改变时调整聊天窗口高度
+    $(window).resize(function() {
+        adjustChatHeight();
+    });
+    
+    // 初始调整聊天窗口高度
+    adjustChatHeight();
+    
+    // 初始化游戏状态
+    initGameState();
 });
 
 /**
@@ -132,10 +152,81 @@ function sendMessage() {
 function updateGameState(state) {
     if (!state) return;
     
+    // 获取当前显示的好感度值
+    const oldCloseness = parseInt($("#affection-value").text()) || 30;
+    
     // 更新好感度
-    const closeness = state.closeness || 30;
-    $("#affection-value").text(closeness);
-    $("#affection-bar").css("width", closeness + "%").attr("aria-valuenow", closeness);
+    const closeness = parseInt(state.closeness) || 30;
+    
+    // 如果好感度发生变化，添加动画效果
+    if (oldCloseness !== closeness) {
+        // 显示变化提示
+        const delta = closeness - oldCloseness;
+        const deltaText = delta > 0 ? `+${delta}` : delta;
+        const deltaClass = delta > 0 ? 'text-success' : 'text-danger';
+        
+        // 创建好感度变化指示器
+        const indicator = $(`<span class="affection-change ${deltaClass}" style="position:absolute;right:10px;opacity:1">${deltaText}</span>`);
+        $("#affection-value").parent().css("position", "relative").append(indicator);
+        
+        // 动画效果：淡出并上移
+        indicator.animate({
+            top: "-=20px",
+            opacity: 0
+        }, 1500, function() {
+            $(this).remove();
+        });
+        
+        // 好感度数值变化动画
+        $({value: oldCloseness}).animate({value: closeness}, {
+            duration: 800,
+            step: function() {
+                $("#affection-value").text(Math.round(this.value));
+            },
+            complete: function() {
+                $("#affection-value").text(closeness);
+            }
+        });
+        
+        // 进度条动画 - 使用直接JavaScript更改宽度，避免任何Bootstrap的过渡效果
+        const progressBar = document.getElementById("affection-bar");
+        
+        // 1. 清除任何可能的样式或类
+        progressBar.style.transition = "none";
+        
+        // 2. 动画更新宽度 - 使用requestAnimationFrame实现平滑动画
+        const startWidth = oldCloseness;  
+        const endWidth = closeness;
+        const duration = 800; // 与其他动画保持一致的时长
+        const startTime = performance.now();
+        
+        function updateProgressBar(currentTime) {
+            const elapsedTime = currentTime - startTime;
+            
+            if (elapsedTime < duration) {
+                // 计算当前宽度百分比 (线性动画)
+                const progress = elapsedTime / duration;
+                const currentWidth = startWidth + (endWidth - startWidth) * progress;
+                
+                // 更新宽度
+                progressBar.style.width = currentWidth + "%";
+                
+                // 继续动画
+                requestAnimationFrame(updateProgressBar);
+            } else {
+                // 动画结束，设置最终宽度
+                progressBar.style.width = endWidth + "%";
+                progressBar.setAttribute("aria-valuenow", endWidth);
+            }
+        }
+        
+        // 开始动画
+        requestAnimationFrame(updateProgressBar);
+    } else {
+        // 无变化时直接更新
+        $("#affection-value").text(closeness);
+        $("#affection-bar").css("width", closeness + "%").attr("aria-valuenow", closeness);
+    }
     
     // 好感度颜色
     if (closeness >= 80) {
@@ -148,15 +239,18 @@ function updateGameState(state) {
         $("#affection-bar").removeClass().addClass("progress-bar bg-danger");
     }
     
-    // 更新关系状态
-    $("#relationship-status").text(state.relationship_state || "初始阶段");
+    // 确保正确获取关系状态
+    const relationshipState = state.relationship_state || state.relationship || "初始阶段";
+    
+    // 更新关系状态显示
+    $("#relationship-status").text(relationshipState);
     
     // 更新场景信息
     $("#scene-info").text(state.scene || "学校 - 百团大战");
     
     // 更新全局状态
     gameState.closeness = closeness;
-    gameState.relationship = state.relationship_state || "初始阶段";
+    gameState.relationship = relationshipState;
     gameState.scene = state.scene || "学校 - 百团大战";
 }
 
@@ -268,120 +362,6 @@ function animateTypingDots() {
 }
 
 /**
- * 显示保存游戏模态框
- */
-function showSaveGameModal() {
-    $("#save-modal").modal("show");
-}
-
-/**
- * 显示加载游戏模态框
- */
-function showLoadGameModal() {
-    // 加载保存的游戏列表
-    $.ajax({
-        url: "/api/get_saves",
-        type: "GET",
-        success: function(data) {
-            // 清空现有选项
-            $("#load-slot").empty();
-            
-            // 如果没有存档
-            if (!data.saves || data.saves.length === 0) {
-                $("#load-slot").append(`<option value="">无可用存档</option>`);
-                $("#confirm-load").prop("disabled", true);
-                $("#load-modal").modal("show");
-                return;
-            }
-            
-            // 添加存档选项
-            data.saves.forEach(save => {
-                const saveInfo = `存档 ${save.slot} - ${save.relationship}(${save.closeness}%) - ${save.date}`;
-                $("#load-slot").append(`<option value="${save.slot}">${saveInfo}</option>`);
-            });
-            
-            $("#confirm-load").prop("disabled", false);
-            $("#load-modal").modal("show");
-        },
-        error: function(xhr, status, error) {
-            showError("无法获取存档列表: " + error);
-        }
-    });
-}
-
-/**
- * 保存游戏
- */
-function saveGame() {
-    const slot = $("#save-slot").val();
-    
-    $.ajax({
-        url: "/api/save",
-        type: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({ slot: slot }),
-        success: function(data) {
-            $("#save-modal").modal("hide");
-            
-            if (data.success) {
-                showSuccess(data.message);
-            } else {
-                showError(data.message);
-            }
-        },
-        error: function(xhr, status, error) {
-            showError("保存游戏失败: " + error);
-        }
-    });
-}
-
-/**
- * 加载游戏
- */
-function loadGame() {
-    const slot = $("#load-slot").val();
-    if (!slot) return;
-    
-    $.ajax({
-        url: "/api/load",
-        type: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({ slot: slot }),
-        success: function(data) {
-            $("#load-modal").modal("hide");
-            
-            if (data.success && data.game_state) {
-                // 如果游戏尚未开始，则显示游戏界面
-                if (!gameState.gameStarted) {
-                    $("#welcome-screen").hide();
-                    $(".game-screen").show();
-                    gameState.gameStarted = true;
-                }
-                
-                // 清空聊天历史
-                $("#chat-history").empty();
-                
-                // 添加系统消息
-                addSystemMessage("游戏已从存档 " + slot + " 加载");
-                
-                // 更新游戏状态
-                updateGameState(data.game_state);
-                
-                // 更新角色图像
-                updateCharacterImage(data.game_state.closeness);
-                
-                showSuccess(data.message);
-            } else {
-                showError(data.message);
-            }
-        },
-        error: function(xhr, status, error) {
-            showError("加载游戏失败: " + error);
-        }
-    });
-}
-
-/**
  * 显示成功提示
  */
 function showSuccess(message) {
@@ -411,4 +391,20 @@ function showLoading(message = "加载中...") {
 function hideLoading() {
     // 隐藏加载动画
     console.log("加载完成");
+}
+
+// 调整聊天窗口高度
+function adjustChatHeight() {
+    const windowHeight = $(window).height();
+    const navbarHeight = $(".navbar").outerHeight();
+    const inputAreaHeight = $(".message-input-container").outerHeight();
+    const bufferHeight = 20; // 额外的间距
+    
+    const chatHeight = windowHeight - navbarHeight - inputAreaHeight - bufferHeight;
+    $("#chat-history").css("height", chatHeight + "px");
+}
+
+// 初始化游戏状态
+function initGameState() {
+    // 实现初始化游戏状态的逻辑
 } 

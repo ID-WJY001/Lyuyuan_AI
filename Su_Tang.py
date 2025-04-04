@@ -144,12 +144,178 @@ class GalGameAgent:
             return []
     
     def chat(self, user_input):
+        # 检测特殊调试命令
+        if user_input.startswith("/debug closeness "):
+            try:
+                # 提取数值
+                value = int(user_input.split("/debug closeness ")[1])
+                # 限制在0-100范围内
+                value = max(0, min(100, value))
+                # 设置亲密度
+                old_value = self.game_state["closeness"]
+                self.game_state["closeness"] = value
+                # 更新关系状态
+                self._update_relationship_state()
+                return f"【调试】亲密度已从 {old_value} 调整为 {value}"
+            except:
+                return "【调试】设置亲密度失败，请使用格式：/debug closeness 数字"
+        
         # 更新系统指导
         # 确保系统提示保留角色设定
         enhanced_prompt = CHARACTER_PROMPT + "\n\n" + CHARACTER_DETAILS
         
         # 每5轮对话添加一次设定提醒，确保角色不会偏离设定
         reminder_message = {"role": "system", "content": "提醒：严格遵守苏糖的角色设定，包括她的家庭背景：独生女，父亲是上市公司高管，母亲是大学老师，家庭和睦美满。请不要添加或编造原设定中没有的信息。"}
+        
+        # 检查亲密度是否达到100，如果是，触发预设表白对话
+        if self.game_state["closeness"] >= 100 and "confession_triggered" not in self.game_state:
+            # 标记表白已触发，避免重复触发
+            self.game_state["confession_triggered"] = True
+            
+            # 预设的表白对话
+            confession_dialogue = """
+【剧情推进：苏糖主动告白】
+
+（你们正坐在学校后面的樱花树下，一片花瓣轻轻落在苏糖的头发上。）
+
+苏糖垂下眼帘，轻轻地捏着裙角，明显比平时紧张。阳光透过树叶的缝隙洒落在她身上，为她镀上一层金边。
+
+苏糖：（深呼吸后抬起头）陈辰...我有些话想跟你说。
+
+（她犹豫了一下，然后突然握住了你的手。她的手心有些微微出汗，但很温暖。）
+
+苏糖：（脸颊泛起红晕）我...我们认识这么久了，一起做过那么多事情...
+
+（她停顿了一下，眼中闪烁着某种你从未见过的光彩。）
+
+苏糖：我发现，不知道从什么时候开始，我的心跳会因为你而加速...看到你和别人说笑，我会有一点点不高兴...
+
+（她轻咬下唇，像是鼓起了极大的勇气。）
+
+苏糖：我本来想等你先开口的...但是...但是我等不及了...
+
+（她紧紧握住你的手，眼神直视着你。）
+
+苏糖：我...我喜欢你，想和你在一起。不仅仅是朋友的那种喜欢...是...是想成为你女朋友的那种喜欢...
+
+（她的声音越来越小，但每一个字都清晰地传入你的耳中。）
+
+请选择你的回应：
+1. 接受表白 - 回复类似"我也喜欢你"/"我愿意做你的男朋友"的话
+2. 拒绝表白 - 回复类似"抱歉"/"我们还是做朋友吧"的话
+
+【提示：你的选择将决定游戏结局】
+            """
+            
+            # 直接返回预设对话，不进行API调用
+            return confession_dialogue
+        
+        # 检查是否已经触发告白，并且用户已经回应
+        if "confession_triggered" in self.game_state and "confession_response" not in self.game_state:
+            # 接受表白的关键词
+            accept_keywords = ["我也喜欢你", "我愿意", "做你的男朋友", "接受", "我也是", "同意", "在一起", "喜欢你", "爱你", "好的"]
+            # 拒绝表白的关键词
+            reject_keywords = ["抱歉", "对不起", "做朋友", "拒绝", "不行", "不能", "不要", "不好", "朋友", "不接受"]
+            
+            # 如果用户回应接受告白
+            if any(keyword in user_input for keyword in accept_keywords):
+                self.game_state["confession_response"] = "accepted"
+                
+                # 甜蜜结局描述
+                happy_ending = """
+【甜蜜结局：两情相悦】
+
+（苏糖听到你的回答，眼睛顿时亮了起来，泪光中满是喜悦。）
+
+苏糖：（声音微微发颤）真...真的吗？
+
+（她小心翼翼地问道，像是害怕自己听错了什么。）
+
+（你再次肯定地点头，她突然扑进你的怀里，紧紧地抱住了你。你能感觉到她的心跳和你的心跳逐渐同步。）
+
+苏糖：（贴在你耳边轻声说）我真的好喜欢你...好久了...
+
+（樱花继续飘落，为这一刻增添了几分如梦如幻的美感。）
+
+【三个月后】
+
+你们的关系越来越亲密，共同的高中生活因为彼此的陪伴而变得更加丰富多彩。
+
+烘焙社因为你们的加入变得非常活跃，甚至在学校文化节上获得了最佳社团奖。苏糖教你制作各种精美的甜点，而你则帮助她完成各种数学难题。
+
+在一次学校郊游中，你们一起登上山顶，远眺整座城市。苏糖依偎在你肩头，轻声说道："遇见你，是我生命中最美好的意外。"
+
+【一年后】
+
+你们一起参加了全国高中生烘焙大赛，苏糖设计的创意蛋糕获得了一等奖。获奖的那一刻，她第一个扑进你的怀里，眼中满是对未来的憧憬。
+
+你们约定好要一起努力，考上同一所大学，继续这段美好的感情。
+
+无论未来如何变化，这段甜蜜的高中恋情，都将成为你们人生中最珍贵的回忆。
+
+【游戏圆满结束】
+                """
+                
+                # 将亲密度设置为最大值
+                self.game_state["closeness"] = 100
+                
+                # 自动保存游戏
+                save_slot = "happy_ending"
+                self.save(save_slot)
+                print(f"游戏已自动保存至存档：{save_slot}")
+                
+                return happy_ending
+            
+            # 如果用户回应拒绝告白
+            elif any(keyword in user_input for keyword in reject_keywords):
+                self.game_state["confession_response"] = "rejected"
+                
+                # 遗憾结局描述
+                sad_ending = """
+【遗憾结局：错过良缘】
+
+（苏糖听到你的回答，笑容凝固在了脸上。她慢慢松开握着你的手，眼中的光彩逐渐黯淡。）
+
+苏糖：（强颜欢笑）啊...这样啊...嗯，我理解的...
+
+（她低下头，努力控制着自己的情绪，但你还是看到有泪珠滴落在她的裙子上。）
+
+苏糖：（擦了擦眼角）对不起，让你为难了...我只是...只是...
+
+（她深吸一口气，抬起头，脸上挤出一个比哭还难看的笑容。）
+
+苏糖：没关系的，我们还是朋友，对吧？我...我得先回家了...
+
+（她迅速站起身，转身快步离开，樱花瓣随着她的脚步轻轻飘落。）
+
+【三个月后】
+
+学校里的气氛变得微妙起来。每次在走廊或食堂遇到苏糖，她都会礼貌地微笑并点头示意，但再也没有之前的亲密和自然。
+
+烘焙社的活动你也很少参加了，听说林雨含接替了一部分苏糖的工作，因为苏糖最近经常请假。
+
+班里的同学偶尔会问起你们的关系，你只能模糊地解释说只是普通朋友。
+
+【一年后】
+
+高二分班后，你和苏糖被分到不同的班级。偶尔在校园里遇见她，她身边常有几个朋友，看起来恢复了往日的活力，但你们之间却始终隔着一道无形的墙。
+
+有一天放学后，你在图书馆门口看到她正和一个陌生男生谈笑风生。不知为何，你心里泛起一阵说不出的失落。
+
+那天晚上回家，翻看手机里曾经和她的合照，你才忽然意识到，有些机会错过了，就再也回不来了。
+
+【游戏遗憾结束】
+                """
+                
+                # 降低亲密度
+                self.game_state["closeness"] = 60
+                
+                # 自动保存游戏
+                save_slot = "sad_ending"
+                self.save(save_slot)
+                print(f"游戏已自动保存至存档：{save_slot}")
+                
+                return sad_ending
         
         # 检查历史中是否已有系统消息
         system_messages = [msg for msg in self.dialogue_history if msg["role"] == "system"]
@@ -206,59 +372,215 @@ class GalGameAgent:
         
         # 创建对话引擎并处理可能的连接错误
         try:
-            # 使用DeepSeek API
-            client = OpenAI(
-                api_key=os.environ.get("DEEPSEEK_API_KEY", "your-deepseek-api-key"),  # 替换为实际API密钥
-                base_url="https://api.deepseek.com/v1"  # DeepSeek的API基础URL
-            )
-            response = client.chat.completions.create(
-                model="deepseek-chat", 
-                messages=self.dialogue_history,
-                temperature=0.7,
-                max_tokens=800
+            # 获取API密钥
+            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+            if not api_key or api_key == "your-deepseek-api-key":
+                print(f"警告: API密钥未设置或无效。请检查.env文件或环境变量。")
+                raise ValueError("API密钥未设置或无效")
+                
+            # 由于openai库存在问题，改用requests库直接调用API
+            # 先清除可能存在的代理设置
+            if "HTTP_PROXY" in os.environ: del os.environ["HTTP_PROXY"]
+            if "HTTPS_PROXY" in os.environ: del os.environ["HTTPS_PROXY"]
+            if "http_proxy" in os.environ: del os.environ["http_proxy"]
+            if "https_proxy" in os.environ: del os.environ["https_proxy"]
+            
+            print(f"尝试直接使用requests调用DeepSeek API...")
+            
+            # 确保消息格式正确
+            valid_messages = []
+            for msg in self.dialogue_history:
+                if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
+                    if msg['role'] in ['system', 'user', 'assistant']:
+                        valid_messages.append(msg)
+            
+            if not valid_messages:
+                print("错误: 消息历史无效")
+                raise ValueError("消息历史无效")
+            
+            print(f"消息数量: {len(valid_messages)}")
+            
+            # 设置API请求头和数据
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+            
+            data = {
+                "model": "deepseek-chat",
+                "messages": valid_messages,
+                "temperature": 0.7,
+                "max_tokens": 800,
+            }
+            
+            # 发送API请求
+            import requests
+            print("正在发送API请求...")
+            response = requests.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                proxies=None,  # 显式禁用代理
+                timeout=30
             )
             
-            # 获取回复
-            reply = response.choices[0].message.content
+            if response.status_code != 200:
+                print(f"API返回错误状态码: {response.status_code}")
+                print(f"错误详情: {response.text}")
+                raise Exception(f"API返回错误状态码: {response.status_code}")
+                
+            # 解析JSON响应
+            result = response.json()
+            reply = result["choices"][0]["message"]["content"]
+            print("API请求成功，获取到回复")
+            
+            # 更新好感度（根据用户输入长度和随机因素）
+            self._update_closeness_based_on_input(user_input)
+            
+        except ValueError as ve:
+            # 处理内部验证错误
+            print(f"API调用验证错误: {str(ve)}")
+            # 使用备用回复
+            reply = self._get_backup_reply()
+            
+            # 使用备用回复时也更新好感度
+            self._update_closeness_based_on_input(user_input)
             
         except Exception as e:
             # 连接错误处理：使用预设回复
             print(f"API连接错误: {str(e)}")
+            print(f"错误类型: {type(e).__name__}")
             
-            # 根据亲密度和情景提供适当的备用回复
-            closeness = self.game_state["closeness"]
-            if len(self.dialogue_history) <= 3:  # 第一次对话
-                reply = "（微笑着看向你）你好！是的，这里就是烘焙社的招新摊位。我是苏糖，高一二班的，烘焙社社长。请问你对烘焙感兴趣吗？"
-            elif closeness < 40:
-                reply = "（礼貌地点头）嗯，你说得对。我们烘焙社平时会有很多有趣的活动，如果你感兴趣的话，可以留下你的联系方式。"
-            elif closeness < 70:
-                reply = "（友好地笑了笑）谢谢你这么说。我很喜欢烘焙，从小就对甜点特别感兴趣。你呢，你平时有什么爱好吗？"
-            else:
-                # 高好感度(>70)亲密期回复
-                replies = [
-                    "（脸上泛起微微的红晕）我们认识这么久了，我发现和你聊天真的很开心呢~（轻轻碰了碰你的手臂）下次我做了新点心，第一个尝的一定是你！",
-                    "（笑容特别明亮）陈辰，你知道吗？我妈妈说我最近总是提起你。（害羞地低头）我想...这周末有个钢琴演奏会，你要不要一起去啊？",
-                    "（自然地整理了一下你的衣领）你今天看起来很精神呢~（眼睛亮亮的）对了，我给糖豆拍了好多新照片，要看看吗？",
-                    "（靠近你些，小声说）其实这个配方我改良了好多次...（抬头看你的眼睛）不过为了你，我愿意分享我的小秘密啦~"
-                ]
-                reply = random.choice(replies)
+            # 使用备用回复
+            reply = self._get_backup_reply()
+            
+            # 使用备用回复时也更新好感度
+            self._update_closeness_based_on_input(user_input)
         
         # 添加到对话历史
         self.dialogue_history.append({"role": "assistant", "content": reply})
         
+        # 获取配置的历史大小，默认100
+        history_size = getattr(self, 'dialogue_history_size', 100)
+        
         # 截断历史（如果需要）
-        if len(self.dialogue_history) > 30:
+        if len(self.dialogue_history) > history_size:
             # 保留system消息和最近的对话
-            systems = [msg for msg in self.dialogue_history[:3] if msg["role"] == "system"]
-            recent = self.dialogue_history[-20:]
+            systems = [msg for msg in self.dialogue_history[:5] if msg["role"] == "system"]
+            # 计算要保留的最近消息数量
+            recent_size = history_size - len(systems)
+            recent = self.dialogue_history[-recent_size:] if recent_size > 0 else []
+            
+            # 确保以列表形式保存
             self.dialogue_history = systems + recent
+            print(f"对话历史已截断至 {len(self.dialogue_history)} 条消息")
         
         return reply
+    
+    def _update_closeness_based_on_input(self, user_input):
+        """根据用户输入更新好感度"""
+        import random
+        
+        # 初始好感度变化值
+        delta = 0
+        
+        # 根据用户输入长度调整好感度
+        if len(user_input) > 20:
+            # 较长的回答增加好感度
+            delta += random.randint(1, 3)
+        elif len(user_input) < 5:
+            # 过短的回答降低好感度
+            delta -= random.randint(0, 2)
+            
+        # 检查特殊关键词
+        # 烘焙相关话题增加好感度
+        if any(word in user_input for word in ["烘焙", "蛋糕", "甜点", "曲奇", "面包"]):
+            delta += random.randint(2, 4)
+            
+        # 其他好感度关键词
+        positive_words = ["喜欢", "开心", "感谢", "笑容", "温柔", "优雅", "美丽"]
+        negative_words = ["讨厌", "无聊", "烦人", "难看", "愚蠢", "懒惰"]
+        
+        # 检查正面词汇
+        for word in positive_words:
+            if word in user_input:
+                delta += random.randint(1, 2)
+                
+        # 检查负面词汇
+        for word in negative_words:
+            if word in user_input:
+                delta -= random.randint(2, 4)
+                
+        # 随机因素（-1到2之间的随机值）
+        delta += random.randint(-1, 2)
+        
+        # 应用好感度变化
+        current = self.game_state["closeness"]
+        new_value = max(0, min(100, current + delta))  # 确保在0-100范围内
+        
+        # 只有当好感度有实际变化时才更新
+        if new_value != current:
+            print(f"好感度变化: {current} -> {new_value} (变化: {delta})")
+            self.game_state["closeness"] = new_value
+            
+            # 更新关系状态
+            self._update_relationship_state()
+            
+            # 检查是否达到100，如果达到且未触发表白，确保下次对话触发
+            if new_value >= 100 and "confession_triggered" not in self.game_state:
+                print("亲密度达到100，下次对话将触发表白事件！")
+                # 确保亲密度刚好是100，不会超过
+                self.game_state["closeness"] = 100
+        
+        return delta
+    
+    def _update_relationship_state(self):
+        """根据好感度更新关系状态"""
+        closeness = self.game_state["closeness"]
+        
+        # 根据好感度设置关系状态
+        if closeness >= 80:
+            self.game_state["relationship_state"] = "亲密关系"
+        elif closeness >= 60:
+            self.game_state["relationship_state"] = "好朋友"
+        elif closeness >= 40:
+            self.game_state["relationship_state"] = "朋友"
+        else:
+            self.game_state["relationship_state"] = "初始阶段"
+            
+        print(f"关系状态更新为: {self.game_state['relationship_state']}")
+    
+    def set_dialogue_history_size(self, size: int = 100):
+        """设置对话历史保留的最大消息数量
+        
+        Args:
+            size: 要保留的消息数量，默认为100条
+        """
+        self.dialogue_history_size = size
+        print(f"对话历史容量已设置为 {size} 条消息")
+        
+        # 如果当前对话历史超过设定大小，立即进行截断
+        if hasattr(self, 'dialogue_history') and isinstance(self.dialogue_history, list) and len(self.dialogue_history) > size:
+            # 保留系统消息和最近的对话
+            systems = [msg for msg in self.dialogue_history[:5] if msg["role"] == "system"]
+            # 计算要保留的最近消息数量
+            recent_size = size - len(systems)
+            recent = self.dialogue_history[-recent_size:] if recent_size > 0 else []
+            
+            # 确保以列表形式保存
+            self.dialogue_history = systems + recent
+            print(f"对话历史已立即截断至 {len(self.dialogue_history)} 条消息")
     
     def save(self, slot):
         # 确保closeness以数值形式存储，而不是字符串
         if "closeness" in self.game_state:
             self.game_state["closeness"] = int(self.game_state["closeness"])
+            
+        # 确保dialogue_history是列表，而不是字典
+        if not isinstance(self.dialogue_history, list):
+            # 如果不小心变成了字典，则创建新的列表
+            self.dialogue_history = [{"role": "system", "content": CHARACTER_PROMPT + "\n\n" + CHARACTER_DETAILS}]
+            print("警告：对话历史格式错误，已重置")
             
         data = {
             "history": self.dialogue_history,
@@ -269,7 +591,14 @@ class GalGameAgent:
     def load(self, slot):
         data = self.storage.load_game(slot)
         if data:
-            self.dialogue_history = data["history"]
+            # 确保加载的dialogue_history是列表
+            if "history" in data and isinstance(data["history"], list):
+                self.dialogue_history = data["history"]
+            else:
+                # 如果历史格式错误，则初始化为空列表并添加系统消息
+                self.dialogue_history = [{"role": "system", "content": CHARACTER_PROMPT + "\n\n" + CHARACTER_DETAILS}]
+                print("警告：加载的对话历史格式错误，已重置")
+                
             self.game_state = data["state"]
             
             # 确保亲密度值是整数类型
@@ -291,3 +620,23 @@ class GalGameAgent:
                 self.game_state["respect_level"] = 0
             return True
         return False
+
+    def _get_backup_reply(self):
+        """生成备用回复，当API调用失败时使用"""
+        # 根据亲密度和情景提供适当的备用回复
+        closeness = self.game_state["closeness"]
+        if len(self.dialogue_history) <= 3:  # 第一次对话
+            return "（微笑着看向你）你好！是的，这里就是烘焙社的招新摊位。我是苏糖，高一二班的，烘焙社社长。请问你对烘焙感兴趣吗？"
+        elif closeness < 40:
+            return "（礼貌地点头）嗯，你说得对。我们烘焙社平时会有很多有趣的活动，如果你感兴趣的话，可以留下你的联系方式。"
+        elif closeness < 70:
+            return "（友好地笑了笑）谢谢你这么说。我很喜欢烘焙，从小就对甜点特别感兴趣。你呢，你平时有什么爱好吗？"
+        else:
+            # 高好感度(>70)亲密期回复
+            replies = [
+                "（脸上泛起微微的红晕）我们认识这么久了，我发现和你聊天真的很开心呢~（轻轻碰了碰你的手臂）下次我做了新点心，第一个尝的一定是你！",
+                "（笑容特别明亮）陈辰，你知道吗？我妈妈说我最近总是提起你。（害羞地低头）我想...这周末有个钢琴演奏会，你要不要一起去啊？",
+                "（自然地整理了一下你的衣领）你今天看起来很精神呢~（眼睛亮亮的）对了，我给糖豆拍了好多新照片，要看看吗？",
+                "（靠近你些，小声说）其实这个配方我改良了好多次...（抬头看你的眼睛）不过为了你，我愿意分享我的小秘密啦~"
+            ]
+            return random.choice(replies)

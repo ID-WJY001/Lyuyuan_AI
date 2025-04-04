@@ -1,19 +1,41 @@
 """
-场景管理器模块
-负责管理游戏中的场景切换、场景限制和场景相关数据
+场景管理器兼容层
+为了保持向后兼容性，重定向到core.scene中的SceneManager实现
 """
 
+import sys
+import os
 import logging
-from typing import Dict, List, Optional
 
-logger = logging.getLogger("SceneManager")
+# 设置项目根目录
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(ROOT_DIR)
 
-class SceneManager:
-    def __init__(self):
-        """初始化场景管理器"""
-        self.current_scene = "烘焙社摊位"
-        self._init_scene_data()
-        
+# 导入核心场景管理器
+try:
+    from core.scene import SceneManager as CoreSceneManager
+    
+    # 为了向后兼容，创建一个包装类
+    class SceneManager(CoreSceneManager):
+        """
+        场景管理器包装类
+        提供向后兼容的接口，实际使用core.scene中的SceneManager实现
+        """
+        def __init__(self, *args, **kwargs):
+            """初始化，直接调用CoreSceneManager的初始化"""
+            super().__init__(*args, **kwargs)
+            logging.getLogger("SceneManager").info("使用核心SceneManager实现")
+            
+except ImportError as e:
+    logging.error(f"导入核心SceneManager失败: {e}")
+    
+    # 如果导入失败，保留旧的实现（但这种情况应该不会发生）
+    class SceneManager:
+        """旧版SceneManager，仅在导入新版失败时使用"""
+        def __init__(self, initial_scene="烘焙社摊位", initial_affection=30):
+            logging.error("使用旧版SceneManager实现（不应该发生）")
+            # 旧版初始化代码...
+
     def _init_scene_data(self):
         """初始化场景相关数据"""
         # 场景跳转相关
@@ -68,4 +90,8 @@ class SceneManager:
         
     def is_farewell_keyword(self, text: str) -> bool:
         """检查是否是告别关键词"""
-        return any(keyword in text for keyword in self.farewell_keywords) 
+        return any(keyword in text for keyword in self.farewell_keywords)
+        
+    def update_affection(self, value: int):
+        """更新好感度值，用于与亲密度系统同步"""
+        self.current_affection = value 

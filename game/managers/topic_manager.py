@@ -14,6 +14,11 @@ class TopicManager:
         self._init_topic_data()
         self.last_topic = None
         self.topic_duration = 0
+        self.active_topics = []
+        self.topic_history = {}
+        self.topic_continuity = 0
+        self.current_affection = 30  # 初始化好感度
+        self.interest_topics = []  # 添加兴趣话题列表
         
     def _init_topic_data(self):
         """初始化话题相关数据"""
@@ -48,6 +53,9 @@ class TopicManager:
                 ]
             }
         }
+        
+        # 初始化兴趣话题
+        self.interest_topics = ["烘焙", "甜点", "音乐", "阅读", "电影", "手工", "旅行"]
         
         # 糖豆相关
         self.sugar_bean_appearance_rate = 0.3
@@ -102,3 +110,16 @@ class TopicManager:
     def get_topic_duration(self) -> int:
         """获取当前话题持续时间"""
         return self.topic_duration 
+
+    def get_interest_topics(self) -> List[str]:
+        """获取当前兴趣话题"""
+        return self.interest_topics
+    
+    def update_affection(self, value: int):
+        """更新好感度值，用于与亲密度系统同步"""
+        self.current_affection = value
+        # 根据好感度调整可用话题
+        if value >= 80 and "恋爱" not in self.available_topics:
+            self.available_topics.append("恋爱")
+        elif value >= 60 and "个人秘密" not in self.available_topics:
+            self.available_topics.append("个人秘密") 

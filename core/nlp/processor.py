@@ -3,14 +3,19 @@ from snownlp import SnowNLP
 from typing import Dict
 import json
 import random
+import os
 
 class NaturalLanguageProcessor:
     def __init__(self, keyword_path: str):
         self.keywords = self._load_keywords(keyword_path)
         try:
-            jieba.load_userdict("data/userdict.txt")  # 加载自定义词典
-        except FileNotFoundError:
-            print("警告：未找到自定义词典文件 data/userdict.txt")
+            # 获取项目根目录
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            userdict_path = os.path.join(root_dir, "data/userdict.txt")
+            jieba.load_userdict(userdict_path)  # 加载自定义词典
+            print(f"成功加载自定义词典: {userdict_path}")
+        except FileNotFoundError as e:
+            print(f"警告：未找到自定义词典文件: {e}")
         
     def analyze(self, text: str) -> Dict:
         """ 执行多维度文本分析 """
