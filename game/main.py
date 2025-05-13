@@ -1,6 +1,12 @@
 """
-绿园中学物语：追女生模拟
-主入口文件
+绿园中学物语：追女生模拟 - 命令行版本游戏主逻辑。
+
+该模块包含了命令行版本游戏的核心运行流程，包括：
+- 初始化游戏环境和设置。
+- 显示游戏介绍和规则。
+- 处理用户输入和特殊命令。
+- 管理游戏主循环和对话交互。
+- 调用 GameManager 进行核心游戏状态管理。
 """
 
 import os
@@ -16,7 +22,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("Main")
 
 def print_game_introduction():
-    """打印游戏介绍"""
+    """打印游戏的背景介绍、规则和基本操作提示。"""
     print("===== 绿园中学物语：追女生模拟 =====")
     print("📝 游戏背景介绍：")
     print("你是陈辰，2021级高一一班的学生。在学校举办的百团大战（社团招新）活动中，")
@@ -33,7 +39,19 @@ def print_game_introduction():
     print("\n命令提示: /exit退出, /save保存, /load读取, /debug调试模式, /status查看社交状态, /help查看帮助")
 
 def handle_command(command, game):
-    """处理用户命令"""
+    """
+    处理用户在游戏中输入的特殊命令。
+
+    根据不同的命令执行相应的操作，如退出游戏、保存/加载存档、
+    切换调试模式、查看状态或帮助信息。
+
+    Args:
+        command (str): 用户输入的命令字符串 (例如, "/save")。
+        game (GameManager): 当前的游戏管理器实例。
+
+    Returns:
+        bool: 如果命令是退出命令 (如 "/exit") 则返回 True，否则返回 False。
+    """
     if command == "/exit":
         print("游戏已退出")
         return True
@@ -89,7 +107,17 @@ def handle_command(command, game):
     return False
 
 def game_loop(game):
-    """游戏主循环"""
+    """
+    游戏的主事件循环。
+
+    负责持续接收用户输入，根据输入类型（命令或对话）调用相应的处理函数，
+    显示游戏角色的回复，并处理可能发生的异常，如 `KeyboardInterrupt`。
+    循环会一直运行直到接收到退出指令或发生严重错误。
+    包含一个概率性的自动存档功能。
+
+    Args:
+        game (GameManager): 当前的游戏管理器实例。
+    """
     try:
         while True:
             try:
@@ -143,7 +171,12 @@ def game_loop(game):
         print(f"游戏发生严重错误，请查看日志: {str(e)}")
 
 def setup_environment():
-    """设置环境变量和API密钥"""
+    """
+    设置游戏运行所需的环境变量，特别是API密钥。
+    
+    尝试从 .env 文件中加载环境变量。
+    如果加载失败，会打印警告信息，游戏仍会尝试继续运行。
+    """
     try:
         # 加载环境变量
         from utils.common import load_env_file
@@ -155,7 +188,11 @@ def setup_environment():
         print("游戏将继续，但可能需要手动设置环境变量。")
 
 def ensure_save_directory():
-    """确保存档目录存在"""
+    """
+    检查并创建用于存放游戏存档的目录（默认为 "saves"）。
+    
+    如果创建失败，会打印警告信息，游戏仍会尝试继续运行，但存档功能可能受影响。
+    """
     try:
         os.makedirs("saves", exist_ok=True)
         logger.info("存档目录准备完成")
@@ -165,7 +202,16 @@ def ensure_save_directory():
         print("游戏将继续，但可能无法保存游戏进度。")
 
 def main():
-    """游戏主函数"""
+    """
+    命令行版本游戏的主入口函数。
+    
+    执行游戏启动的完整流程：
+    1. 设置环境变量。
+    2. 确保存档目录存在。
+    3. 初始化 GameManager。
+    4. 显示游戏介绍和初始状态。
+    5. 进入游戏主循环。
+    """
     try:
         # 设置环境变量
         setup_environment()

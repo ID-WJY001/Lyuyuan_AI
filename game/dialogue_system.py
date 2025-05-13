@@ -1,6 +1,19 @@
 """
-对话处理系统模块
-负责处理玩家输入、生成回复和计算亲密度变化
+对话处理系统 (Dialogue System) 模块。
+
+该模块负责游戏中的核心对话流程管理，包括：
+- 处理玩家的输入文本。
+- 与 AI 角色代理 (GalGameAgent) 交互以生成回复。
+- 调用情感系统 (AffectionSystem) 来计算和更新亲密度。
+- 管理游戏状态的更新，如连续积极/消极对话计数。
+- 根据亲密度和玩家行为（如严重侮辱）检查游戏结束条件。
+- 生成并向玩家展示亲密度变化的反馈信息，支持调试模式下的详细信息。
+- 与剧情管理器 (StorylineManager) 协作，根据亲密度触发游戏剧情。
+- 与场景管理器 (SceneManager) 协作，处理场景的转换和时间的推进。
+- 与成就系统 (AchievementSystem) 协作，检查并处理新解锁的成就及其奖励。
+- 将对话历史记录到数据库中，以供回顾或分析。
+- 提供随机的游戏内提示，增加互动性和趣味性。
+- 实现自动保存功能，确保玩家进度的安全。
 """
 
 import random
@@ -14,25 +27,34 @@ import logging
 from core import AffectionEvent, SocialRisk
 
 class DialogueSystem:
+    """
+    对话系统类，管理游戏中的对话交互逻辑。
+
+    Attributes:
+        game_manager (GameManager): 游戏管理器实例，用于访问游戏的其他组件和状态。
+    """
     def __init__(self, game_manager):
         """
-        初始化对话系统
-        
+        初始化对话系统。
+
         Args:
-            game_manager: 游戏管理器实例
+            game_manager (GameManager): 游戏管理器实例。
         """
         self.game_manager = game_manager
         
     def process_dialogue(self, user_input, dialogue_history):
         """
-        处理玩家输入并更新游戏状态
-        
+        处理玩家的输入，驱动对话流程，并更新游戏状态。
+
+        该方法是对话系统的核心，协调多个游戏子系统（AI代理、情感、剧情、场景、成就等）
+        以响应玩家的输入，生成AI的回复，并相应地修改游戏世界。
+
         Args:
-            user_input: 玩家输入的文本
-            dialogue_history: 对话历史
+            user_input (str): 玩家输入的文本。
+            dialogue_history (list): 当前的对话历史记录。
             
         Returns:
-            AI角色的回复文本
+            str: AI 角色的回复文本，可能包含亲密度变化、剧情触发、场景转换、成就解锁等信息。
         """
         # 空输入检查
         if not user_input or user_input.isspace():
@@ -158,16 +180,20 @@ class DialogueSystem:
         
     def _generate_affection_info(self, delta, previous_affection, final_affection, result):
         """
-        生成亲密度变化信息
-        
+        根据亲密度的变化情况，生成向玩家反馈的信息文本。
+
+        信息会根据亲密度变化的幅度（如显著提升/下降、急剧下降）采用不同的表达方式。
+        在调试模式下，会附加更详细的亲密度计算过程和相关影响因素。
+
         Args:
-            delta: 亲密度变化值
-            previous_affection: 之前的亲密度
-            final_affection: 当前亲密度
-            result: 亲密度处理结果
+            delta (float): 本次对话中亲密度的变化值。
+            previous_affection (float): 处理前一刻的亲密度值。
+            final_affection (float): 处理后当前的亲密度值。
+            result (dict): 亲密度系统 (AffectionSystem) process_dialogue 方法返回的详细结果，
+                           包含调试信息 (debug_info)。
             
         Returns:
-            亲密度变化信息文本
+            str: 格式化的亲密度变化信息文本。
         """
         affection_info = ""
         
@@ -234,7 +260,14 @@ class DialogueSystem:
         return affection_info
     
     def _get_random_tip(self):
-        """获取一个随机追女生技巧提示"""
+        """
+        从预设的提示列表中随机获取一条"约会技巧"或游戏提示。
+        
+        为了避免重复，会确保新获取的提示与上一次的不同。
+
+        Returns:
+            str: 一条随机选择的提示文本。
+        """
         # 避免连续显示同一个提示
         available_indices = [i for i in range(len(self.game_manager.dating_tips)) 
                              if i != self.game_manager.last_tip_index]
@@ -244,13 +277,16 @@ class DialogueSystem:
     
     def _check_for_severe_insults(self, text):
         """
-        检查是否包含严重侮辱性言论
-        
+        检查输入文本中是否包含预定义的严重侮辱性词汇或短语。
+
+        使用了固定词表匹配和正则表达式匹配两种方式来提高检测的覆盖率。
+        主要用于触发特定的游戏惩罚机制，例如亲密度直接归零并导致游戏结束。
+
         Args:
-            text: 要检查的文本
+            text (str): 需要检查的玩家输入文本。
         
         Returns:
-            bool: 是否包含侮辱性言论
+            bool: 如果文本中包含严重侮辱性言论，则返回 True；否则返回 False。
         """
         severe_insults = [
             "傻逼", "操你", "滚蛋", "去死", "混蛋", "贱人", "婊子", "烂货", 

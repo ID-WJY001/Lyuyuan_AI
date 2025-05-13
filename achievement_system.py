@@ -131,21 +131,32 @@ class AchievementSystem:
     
     def _initialize_default_achievements(self):
         """
-        初始化默认成就列表
-        定义游戏中的基本成就，包括各种类型的成就
+        初始化默认成就。
+        如果数据库中没有成就数据，则添加预定义的默认成就。
         """
+        # 检查是否已有成就
+        conn_check = sqlite3.connect(self.db_path)
+        cursor_check = conn_check.cursor()
+        cursor_check.execute("SELECT COUNT(*) FROM achievements")
+        count = cursor_check.fetchone()[0]
+        conn_check.close()
+
+        if count > 0:
+            # print("成就已存在，跳过初始化。")
+            return
+
         default_achievements = [
             {
-                "id": "first_meeting",
-                "name": "初次见面",
-                "description": "与苏糖的第一次对话",
+                "id": "first_chat_Su_Tang",
+                "name": "初次相遇·苏糖",
+                "description": "与苏糖完成第一次对话。",
                 "requirements": json.dumps({
                     "type": "dialogue_count",
-                    "character": "su_tang",
+                    "character": "Su_Tang",
                     "count": 1
                 }),
                 "reward": "好感度+5",
-                "icon": "🌱",
+                "icon": "💬",
                 "secret": 0
             },
             {
@@ -291,11 +302,16 @@ class AchievementSystem:
     
     def check_achievements(self, game_manager):
         """
-        检查是否有新的成就达成
+        检查是否有新的成就达成。
+
+        此方法会根据当前游戏状态（如好感度、对话次数、访问过的场景等）
+        与预设的成就达成条件进行比较，以确定玩家是否解锁了新的成就。
+
         参数:
-            game_manager: 游戏管理器对象，包含当前游戏状态
+            game_manager: 游戏管理器对象 (GameManager)，包含当前游戏状态信息。
+
         返回值:
-            新解锁的成就列表
+            list: 一个包含新解锁的成就 (Achievement) 对象的列表。如果没有新成就解锁，则返回空列表。
         """
         unlocked = []
         
@@ -357,9 +373,13 @@ class AchievementSystem:
     
     def _save_unlocked_achievements(self, achievements):
         """
-        保存解锁的成就到数据库
+        将新解锁的成就保存到数据库中。
+
+        此方法会更新 `player_achievements` 表，记录成就的解锁状态和解锁时间。
+        如果成就记录已存在，则更新；否则，插入新记录。
+
         参数:
-            achievements: 已解锁的成就对象列表
+            achievements: 一个包含已解锁的成就 (Achievement) 对象的列表。
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -397,21 +417,28 @@ class AchievementSystem:
     
     def get_achievement_notification(self, achievement):
         """
-        生成成就解锁通知文本
+        为解锁的成就生成通知文本。
+
         参数:
-            achievement: 成就对象
+            achievement: 成就 (Achievement) 对象。
+
         返回值:
-            格式化的成就解锁通知文本
+            str: 格式化的成就解锁通知文本，例如："🏆 成就解锁: 【初次相遇·苏糖】\\n与苏糖完成第一次对话。\\n奖励: 好感度+5"
         """
-        return f"🏆 成就解锁: 【{achievement.name}】\n{achievement.description}\n奖励: {achievement.reward if achievement.reward else '无'}"
+        return f"🏆 成就解锁: 【{achievement.name}】\\n{achievement.description}\\n奖励: {achievement.reward if achievement.reward else '无'}"
     
     def get_all_achievements(self, include_secret=False):
         """
-        获取所有成就列表
+        获取所有成就的列表，用于展示给玩家。
+
+        可以控制是否包含未解锁的隐藏成就。
+        对于未解锁的隐藏成就，其描述将显示为 "???"。
+
         参数:
-            include_secret: 是否包括未解锁的隐藏成就，默认为False
+            include_secret (bool, optional): 是否包括未解锁的隐藏成就。默认为 False。
+
         返回值:
-            成就信息字典列表
+            list: 一个字典列表，每个字典代表一个成就，包含其 ID、名称、描述、是否解锁、解锁日期、图标和奖励。
         """
         achievements_list = []
         
@@ -434,12 +461,18 @@ class AchievementSystem:
     
     def get_achievement_progress(self, achievement_id):
         """
-        获取特定成就的完成进度
+        获取特定成就的完成进度。
+
+        注意：目前此方法主要用于从数据库读取已存储的进度，
+        对于需要动态计算进度的复杂成就，可能需要在此方法或 `check_achievements` 中实现更复杂的逻辑。
+        当前的实现假设进度值 (0.0 到 1.0) 被直接存储在 `player_achievements` 表的 `progress` 列。
+
         参数:
-            achievement_id: 成就ID
+            achievement_id (str): 要查询进度的成就 ID。
+
         返回值:
-            成就完成进度百分比，范围为0.0到1.0
-            如果成就不存在则返回None
+            float: 成就的完成进度百分比 (0.0 到 1.0)。如果成就不存在，则返回 None。
+                     如果数据库中没有进度记录，默认为 0.0。
         """
         if achievement_id not in self.achievements:
             return None

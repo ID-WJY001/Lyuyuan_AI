@@ -1,3 +1,4 @@
+
 from datetime import datetime, timedelta
 import random
 import re
@@ -104,7 +105,6 @@ class SceneManager:
         }
         
     def analyze_conversation(self, user_input, ai_reply, current_scene, current_date, current_time):
-        """分析对话内容，判断是否需要场景切换"""
         # 更新对话计数
         self.conversation_state["conversation_count"] += 1
         

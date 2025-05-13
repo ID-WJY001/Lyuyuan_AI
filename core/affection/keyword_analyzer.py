@@ -1,15 +1,42 @@
+"""
+关键词分析器模块。
+
+定义了 `KeywordAnalyzer` 类，负责从文本中提取话题、检测不当内容（如侮辱、
+性暗示、不尊重言论），以及根据预定义的关键词类别和使用频率分析关键词对
+情感系统的潜在影响。
+"""
 import jieba
 from collections import Counter
 import re
 
 class KeywordAnalyzer:
     def __init__(self, config):
-        """初始化关键词分析器"""
+        """
+        初始化关键词分析器。
+
+        Args:
+            config (dict): 一个配置字典，通常来源于情感系统的配置文件。
+                           期望包含 `keyword_categories` 等关键词相关设置。
+        
+        `keyword_usage_history` 用于追踪每个关键词的使用频率，以实现效果衰减。
+        """
         self.keyword_usage_history = {}  # 记录关键词使用频率
         self.config = config
     
     def extract_topics(self, text):
-        """从文本中提取主要话题"""
+        """
+        从输入文本中提取主要话题（一个简单的实现）。
+
+        使用 `jieba` 分词，并进行基本的过滤（去除过短词、数字、常见停用词），
+        然后返回最多前3个符合条件的词作为识别出的话题。
+
+        Args:
+            text (str): 需要提取话题的原始文本。
+
+        Returns:
+            list[str]: 一个包含识别出的话题字符串的列表 (最多3个)。
+                       如果提取失败或无有效话题，则返回空列表。
+        """
         try:
             # 简单实现，使用结巴分词
             seg_list = jieba.lcut(text)
@@ -22,7 +49,22 @@ class KeywordAnalyzer:
             return []
     
     def check_inappropriate(self, text):
-        """检查文本中是否包含不适当内容"""
+        """
+        检查输入文本中是否包含不适当或冒犯性的内容。
+
+        通过正则表达式匹配预定义的多种不当言论模式，包括：
+        - 侮辱性词汇 (例如 "笨蛋", "垃圾")
+        - 不当性暗示 (例如 "脱光", "操你")
+        - 不尊重的指令或言论 (例如 "闭嘴", "滚开")
+
+        Args:
+            text (str): 需要检查的原始文本。
+
+        Returns:
+            list[str]: 一个包含所有检测到的不当内容类别描述字符串的列表。
+                       例如：["侮辱性言论", "不适当的性暗示"]。
+                       如果未检测到不当内容，则返回空列表。
+        """
         # 侮辱性词汇
         insult_patterns = [
             r"笨蛋", r"白痴", r"废物", r"垃圾", r"傻[逼比屄]", r"贱[人货]", 
@@ -67,7 +109,19 @@ class KeywordAnalyzer:
         return found_inappropriate
     
     def get_keyword_category(self, keyword):
-        """获取关键词的类别"""
+        """
+        根据提供的关键词，从配置中查找并返回其所属的预定义类别。
+
+        配置项 `keyword_categories` 期望的格式为：
+        `{"positive": ["开心", "喜欢"], "negative": ["讨厌", "难过"]}`
+
+        Args:
+            keyword (str): 需要查询类别的单个关键词。
+
+        Returns:
+            str or None: 如果找到，则返回关键词的类别名称 (例如 "positive")；
+                         否则返回 None。
+        """
         keyword_categories = self.config.get("keyword_categories", {})
         for category, words in keyword_categories.items():
             if keyword in words:
@@ -75,35 +129,55 @@ class KeywordAnalyzer:
         return None
     
     def analyze_keywords(self, keywords):
-        """分析关键词并计算影响"""
+        """
+        分析提供的关键词列表，计算它们对亲密度的综合影响值 (delta)。
+
+        处理逻辑包括：
+        1. 效果衰减：如果一个关键词在近期被多次使用 (超过3次)，其效果会降低或消失。
+        2. 分类计分：根据关键词的预定义类别 (正面、负面、兴趣等)给予不同的分数。
+           使用 `used_keywords` 集合确保同一类别的多个不同关键词在本轮分析中不重复计分。
+        
+        Args:
+            keywords (list[str]): 从文本中提取出的关键词列表。
+
+        Returns:
+            dict: 一个包含两项的字典：
+                  - "delta" (float): 所有分析的关键词产生的总亲密度影响值。
+                  - "matched_keywords" (list[str]): 在分析过程中实际被处理并计分的关键词列表。
+        """
         keyword_delta = 0
         matched_keywords = []
-        used_keywords = set()  # 防止同一类别的多个关键词都加分
+        used_keywords = set()  # 用于确保同一情感类别的关键词在本轮分析中只计一次分
         
         for keyword in keywords:
-            # 检查关键词是否已经过度使用
+            # 检查关键词是否已经因过度使用而效果衰减
             if keyword in self.keyword_usage_history:
                 uses = self.keyword_usage_history[keyword]
-                if uses >= 3:  # 同一关键词使用超过3次，效果衰减
-                    continue
+                if uses >= 3:  # 同一关键词使用超过3次，不再产生影响
+                    continue # 跳过此关键词
                 self.keyword_usage_history[keyword] = uses + 1
             else:
-                self.keyword_usage_history[keyword] = 1
+                self.keyword_usage_history[keyword] = 1 # 首次使用，计数为1
             
-            # 分类处理关键词
+            # 获取关键词分类并据此计算影响
             category = self.get_keyword_category(keyword)
-            if category and category not in used_keywords:
+            if category and category not in used_keywords: # 必须有分类且该分类未被用于本轮计分
                 if category == "positive":
-                    keyword_delta += 1.5  # 正面词汇加分
+                    keyword_delta += self.config.get("keyword_effects", {}).get("positive", 1.5)
                     used_keywords.add(category)
                 elif category == "negative":
-                    keyword_delta -= 2.5  # 负面词汇扣分
+                    keyword_delta -= self.config.get("keyword_effects", {}).get("negative", 2.5)
                     used_keywords.add(category)
-                elif category == "interest" and category not in used_keywords:
-                    keyword_delta += 2.0  # 兴趣关键词奖励
-                    used_keywords.add(category)
+                elif category == "interest": # 兴趣类可以独立于 positive/negative 单独加分
+                    keyword_delta += self.config.get("keyword_effects", {}).get("interest", 2.0)
+                    # 注意：如果一个词同时是positive和interest，这里只按interest加了一次used_keywords，
+                    # 如果希望分开判断，used_keywords可能需要更复杂的逻辑或按类别分别判断。
+                    # 但当前实现是合理的，避免了例如"喜欢烘焙"中的"喜欢"和"烘焙"分别按正面和兴趣加两次大分。
+                    # 更好的做法可能是让 get_keyword_category 返回所有匹配的类别，然后分别处理。
+                    # 不过当前逻辑下，一个关键词只会属于一个主要类别。若要支持多类别，配置和get_keyword_category需调整。
+                    used_keywords.add(category) # 兴趣类也只让同类词生效一次
                 
-                matched_keywords.append(keyword)
+                matched_keywords.append(keyword) # 记录实际参与计分的关键词
         
         return {
             "delta": keyword_delta,

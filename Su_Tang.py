@@ -37,6 +37,13 @@ CHARACTER_DETAILS = """
 
 class GalGameAgent:
     def __init__(self, load_slot=None, is_new_game=False):
+        """
+        初始化 GalGameAgent 实例。
+
+        Args:
+            load_slot (str, optional): 要加载的存档槽位名称。默认为 None。
+            is_new_game (bool, optional): 是否强制开始新游戏，即使有存档槽位。默认为 False。
+        """
         self.storage = GameStorage()
         self.dialogue_history = []
         self.game_state = {
@@ -57,7 +64,13 @@ class GalGameAgent:
             self._init_new_game(is_new_game)
     
     def _init_new_game(self, is_new_game=False):
-        """ 新游戏初始化 """
+        """ 
+        初始化新游戏的状态和对话历史。
+
+        Args:
+            is_new_game (bool, optional): 是否是一个全新的游戏会话（例如，从主菜单选择新游戏）。
+                                         如果为 True，则不会添加苏糖的初始开场白。默认为 False。
+        """
         enhanced_prompt = CHARACTER_PROMPT + "\n\n" + CHARACTER_DETAILS
         
         # 初始化对话历史，但不添加苏糖的第一句话
@@ -73,7 +86,13 @@ class GalGameAgent:
         self.dialogue_history = initial_messages
     
     def _get_contextual_guideline(self):
-        """根据当前游戏状态生成上下文相关的指导方针"""
+        """
+        根据当前游戏状态（如亲密度、心情、无聊程度等）生成上下文相关的指导方针。
+        这些指导方针会作为系统消息提供给AI，以引导其生成更符合当前情境的回复。
+
+        Returns:
+            str: 包含各项指导方针的字符串，每条方针占一行。
+        """
         guidelines = [
             "你是苏糖，绿园中学高一二班的学生，烘焙社社长。你现在正在百团大战活动中为烘焙社招新。",
             "你是个温柔、甜美的女生，但也有自己的原则和底线。",
@@ -132,7 +151,16 @@ class GalGameAgent:
         return "\n".join(guidelines)
     
     def _extract_topics(self, text):
-        """从文本中提取主要话题"""
+        """
+        从给定的文本中提取主要话题。
+        目前使用 jieba 分词进行关键词提取作为简单实现。
+
+        Args:
+            text (str): 需要提取话题的文本。
+
+        Returns:
+            list: 包含提取到的话题关键词的列表。如果提取失败，则返回空列表。
+        """
         # 简单实现，实际应用可能需要更复杂的NLP
         import jieba.analyse
         try:
@@ -144,6 +172,24 @@ class GalGameAgent:
             return []
     
     def chat(self, user_input):
+        """
+        处理用户输入，生成并返回苏糖的回复。
+
+        这个方法是游戏的核心交互逻辑，包括：
+        1. 处理调试命令。
+        2. 管理和更新系统消息（角色设定、上下文指导、提醒）。
+        3. 处理特殊游戏事件，如亲密度达到100时的表白事件及其后续。
+        4. 调用外部API（DeepSeek）获取AI生成的对话内容。
+        5. 处理API调用失败时的备用回复逻辑。
+        6. 更新游戏状态，如话题、对话质量、好感度等。
+        7. 管理对话历史的长度。
+
+        Args:
+            user_input (str): 用户的输入文本。
+
+        Returns:
+            str: 苏糖的回复文本。
+        """
         # 检测特殊调试命令
         if user_input.startswith("/debug closeness "):
             try:
@@ -572,6 +618,17 @@ class GalGameAgent:
             print(f"对话历史已立即截断至 {len(self.dialogue_history)} 条消息")
     
     def save(self, slot):
+        """将当前的游戏状态和对话历史保存到指定的存档槽位。
+
+        在保存前会进行数据类型检查和修正，例如确保 `closeness` 为整数，
+        `dialogue_history` 为列表。
+
+        Args:
+            slot (str): 存档槽位的名称。
+
+        Returns:
+            任何 GameStorage.save_game 可能返回的值 (通常是 bool 或 None)。
+        """
         # 确保closeness以数值形式存储，而不是字符串
         if "closeness" in self.game_state:
             self.game_state["closeness"] = int(self.game_state["closeness"])
@@ -589,6 +646,19 @@ class GalGameAgent:
         return self.storage.save_game(data, slot)
     
     def load(self, slot):
+        """从指定的存档槽位加载游戏状态和对话历史。
+
+        加载时会进行数据校验和修复：
+        - 确保 `dialogue_history` 是列表格式。
+        - 确保 `closeness` 是整数。
+        - 确保 `game_state` 包含所有必要的字段，若缺少则使用默认值填充。
+
+        Args:
+            slot (str): 存档槽位的名称。
+
+        Returns:
+            bool: 如果加载成功则返回 True，否则返回 False。
+        """
         data = self.storage.load_game(slot)
         if data:
             # 确保加载的dialogue_history是列表
