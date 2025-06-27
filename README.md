@@ -1,4 +1,4 @@
-# 绿园中学物语——苏糖【网页测试版v0.0.4：烘焙社偶遇】
+# 绿园中学物语——苏糖
 ## 📝游戏背景介绍：
   - 你是陈辰，高一一班的学生。在学校举办的百团大战（社团招 新）活动中，你在烘焙社的摊位前看到了一个让你一见钟情的女生——她正在认真地为过往的学生介绍烘焙社。她身穿整洁的校服，戴着烘焙社的围裙，笑容甜美，举止优雅。
   - 保持礼貌，让对话有趣且有深度
@@ -32,4 +32,59 @@
 | 🌸 破冰期   | 主动分享趣事，偶尔微笑                     | "要尝尝我做的曲奇吗？"            |
 | 🔥 亲密期   | 身体接触增多，私下撒娇                     | "下周音乐会...你会来的吧？"       |
 
-## 最近一次更新：2025.04.04 版本：v0.0.4
+
+## 安装与运行
+
+### 环境设置
+
+1.  **Python:** 确保安装 Python 3.8 或更高版本。
+2.  **克隆仓库 (如果通过Git):**
+    ```bash
+    git clone <repository_url>
+    cd Su_Tang 
+    ```
+3.  **创建并激活虚拟环境 (推荐):**
+    ```bash
+    python -m venv venv 
+    # Windows
+    venv\Scripts\activate
+    # macOS/Linux
+    source venv/bin/activate
+    ```
+4.  **安装依赖:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+    这会安装 `requirements.txt` 文件中列出的所有库，例如 `Flask`, `openai`, `pyyaml`, `jieba`, `SnowNLP`, `colorama`。
+5.  **配置 API Key:**
+    *   复制 `.env.example` 文件并重命名为 `.env`。
+    *   打开 `.env` 文件，将其中的 `DEEPSEEK_API_KEY=` (或相应的LLM API密钥字段) 替换为你自己的有效API密钥。
+    ```
+    DEEPSEEK_API_KEY=your_actual_api_key_here
+    ```
+6.  **(可选) 下载 jieba 词典:**
+    第一次运行 `NaturalLanguageProcessor` 时，`jieba` 可能会尝试下载其默认词典。确保网络连接通畅。如果项目包含自定义词典 (如 `user_dict.txt`)，确保路径配置正确。
+
+### 运行游戏
+
+*   **命令行版本:**
+    在项目根目录下，激活虚拟环境后运行：
+    ```bash
+    python main.py
+    ```
+    或者直接运行 `game` 目录下的 `main.py`:
+    ```bash
+    python game/main.py
+    ```
+
+*   **Web 版本:**
+    在项目根目录下，激活虚拟环境后运行：
+    ```bash
+    python web_start.py
+    ```
+    或者 (如果在Windows上，且 `start_web.bat` 配置正确)：
+    ```bash
+    ./start_web.bat
+    ```
+    启动成功后，通常会在终端显示类似 `* Running on http://127.0.0.1:5000/` 的信息。
+    然后在你的网页浏览器中打开显示的地址 (通常是 `http://127.0.0.1:5000` 或 `http://localhost:5000`)。
