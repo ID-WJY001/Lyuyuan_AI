@@ -99,12 +99,12 @@ function startGame() {
 }
 
 /**
- * 发送用户消息
+ * 发送用户消息 (伪打字机版本)
  */
 function sendMessage() {
     const userInput = $("#user-input").val().trim();
     if (userInput === "") return;
-    
+
     // 添加用户消息到对话框
     addUserMessage(userInput);
     
@@ -114,30 +114,48 @@ function sendMessage() {
     // 滚动到底部
     scrollChatToBottom();
     
-    // 显示加载动画
-    showTypingIndicator();
+    // 显示旧的“正在输入”动画，让用户知道系统有反应
+    showTypingIndicator(); 
     
-    // 发送消息到服务器
+    // 发送消息到服务器 (这里是你原来的、能正常工作的 $.ajax 调用)
     $.ajax({
         url: "/api/chat",
         type: "POST",
         contentType: "application/json",
         data: JSON.stringify({ message: userInput }),
         success: function(data) {
-            // 移除输入指示器
+            // 1. 成功后，立刻移除“正在输入”的动画
             removeTypingIndicator();
             
-            // 添加AI回复
-            addAssistantMessage(data.response);
-            
-            // 更新游戏状态
-            updateGameState(data.game_state);
-            
-            // 更新角色图像
-            updateCharacterImage(data.game_state.closeness);
-            
-            // 滚动到底部
-            scrollChatToBottom();
+            // 2. 获取到完整的回复文本
+            const fullResponseText = data.response;
+
+            // 3. 创建一个空的AI消息气泡
+            const assistantMessageHtml = `<div class="assistant-message"></div>`;
+            $("#chat-history").append(assistantMessageHtml);
+            const messageElement = $("#chat-history .assistant-message").last();
+
+            // 4. --- 伪打字机效果的核心 ---
+            let charIndex = 0;
+            const typingSpeed = 50; // 打字速度，单位是毫秒，数字越小越快
+
+            const typingInterval = setInterval(function() {
+                if (charIndex < fullResponseText.length) {
+                    // 添加一个字
+                    messageElement.html(formatMessage(fullResponseText.substring(0, charIndex + 1)));
+                    charIndex++;
+                    // 每打一个字都滚动到底部
+                    scrollChatToBottom();
+                } else {
+                    // 所有字都打完了，清除定时器
+                    clearInterval(typingInterval);
+                    
+                    // 打字结束后，再更新游戏状态（好感度条等），这样动画效果更自然
+                    updateGameState(data.game_state);
+                    updateCharacterImage(data.game_state.closeness);
+                }
+            }, typingSpeed);
+
         },
         error: function(xhr, status, error) {
             removeTypingIndicator();
@@ -145,7 +163,6 @@ function sendMessage() {
         }
     });
 }
-
 /**
  * 更新游戏状态显示
  */
