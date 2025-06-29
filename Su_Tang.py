@@ -136,10 +136,13 @@ class GalGameAgent:
         print(f"[DEBUG] Step 3: Parsed AI Response -> '{ai_response}'")
         print(f"[DEBUG] Step 4: Parsed Analysis -> {analysis}")
 
-        print("\n" + "="*20 + " ANALYSIS COMPARISON " + "="*20)
-        old_affection_delta = self._get_closeness_delta_based_on_input(user_input)
-        print(f"[OLD SYSTEM] Affection Delta: {old_affection_delta}")
-        
+        print("\n" + "="*20 + " LLM ANALYSIS RESULT " + "="*20)
+        if isinstance(analysis, dict) and "error" not in analysis:
+            print(f"Thought Process: {analysis.get('thought_process', 'N/A')}")
+            print(f"Affection Delta: {analysis.get('affection_delta', 0)} (Reason: {analysis.get('affection_delta_reason', 'N/A')})")
+        else:
+            print("Analysis failed or not available.")
+        print("="*53 + "\n")
         if isinstance(analysis, dict) and "error" not in analysis:
             new_affection_delta = analysis.get('affection_delta', 0)
             reason = analysis.get('affection_delta_reason', 'N/A')
@@ -150,7 +153,18 @@ class GalGameAgent:
 
         print("[DEBUG] Step 5: Updating game state...")
         self.dialogue_history.append({"role": "user", "content": user_input})
-        self._update_closeness(old_affection_delta)
+        if isinstance(analysis, dict) and "error" not in analysis:
+            new_affection_delta = analysis.get('affection_delta', 0)
+            boredom_delta = analysis.get('boredom_delta', 0) # [新] 我们也开始用新的无聊度
+
+            print(f"--- [ACTION] APPLYING NEW DELTA: Affection={new_affection_delta}, Boredom={boredom_delta} ---")
+
+            # 使用新系统的好感度变化值
+            self._update_closeness(new_affection_delta)
+
+            # [新] 更新无聊度 (假设你的 boredom_level 越高越无聊)
+            current_boredom = self.game_state.get("boredom_level", 0)
+            self.game_state["boredom_level"] = max(0, current_boredom + boredom_delta)
 
         if isinstance(analysis, dict) and "triggered_topics" in analysis:
             topics = analysis.get("triggered_topics", [])
@@ -266,18 +280,6 @@ class GalGameAgent:
         if not recent_dialogue: return "（你们还没有开始对话）"
         lines = [f"陈辰: {e['content']}" if e['role'] == 'user' else f"苏糖: {e['content']}" for e in recent_dialogue]
         return "\n".join(lines)
-
-    def _get_closeness_delta_based_on_input(self, user_input):
-        delta = 0
-        if len(user_input) > 20: delta += random.randint(1, 3)
-        elif len(user_input) < 5: delta -= random.randint(0, 2)
-        if any(w in user_input for w in ["烘焙", "蛋糕", "甜点", "曲奇", "面包"]): delta += random.randint(2, 4)
-        for w in ["喜欢", "开心", "感谢", "笑容", "温柔", "优雅", "美丽"]:
-            if w in user_input: delta += random.randint(1, 2)
-        for w in ["讨厌", "无聊", "烦人", "难看", "愚蠢", "懒惰"]:
-            if w in user_input: delta -= random.randint(2, 4)
-        delta += random.randint(-1, 2)
-        return delta
 
     def _update_closeness(self, delta: int):
         if delta == 0: return
