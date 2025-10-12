@@ -1,10 +1,8 @@
-# web_start.py - [最终独立版]
+# web_start.py
 
 import os
 import logging
 from dotenv import load_dotenv
-
-# --- 内置核心功能，不再需要 utils ---
 
 def setup_environment():
     """

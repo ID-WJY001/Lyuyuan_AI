@@ -6,3 +6,4 @@ itsdangerous==2.1.2
 click==8.1.7
 pyyaml==6.0.1
 openai==1.19.0 
+jieba==0.42.1

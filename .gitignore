@@ -4,6 +4,7 @@ __pycache__/
 
 # Virtual Environment
 .venv/
+web_venv/
 Include/
 Lib/
 Scripts/
@@ -22,11 +23,15 @@ userdict.txt
 # Generated Files
 saves/
 *.db
-*.json
+## Narrow JSON ignore to saves only (avoid hiding config JSON elsewhere)
+saves/*.json
 *.log
 
 # Temporary Files
 *.tmp
 *.bak
+
+# Misc folders accidentally committed
+~/
 
 .env

@@ -1,8 +1,3 @@
-/**
- * 绿园中学物语：追女生模拟
- * Web版本JavaScript交互
- */
-
 // 游戏状态
 const gameState = {
     initialized: false,
@@ -10,7 +5,7 @@ const gameState = {
     closeness: 30,
     relationship: "初始阶段",
     scene: "学校 - 百团大战",
-    timeInfo: "2023年9月1日 上午"
+    timeInfo: "2025年9月1日 上午"
 };
 
 // DOM加载完成后执行
@@ -25,7 +20,7 @@ $(document).ready(function() {
     });
     
     // 初始化提示
-    console.log("绿园中学物语：追女生模拟 - Web版本已加载");
+    console.log("绿园中学物语 - Web版本已加载");
     
     // 开始游戏按钮点击事件
     $("#start-btn").click(startGame);
@@ -53,9 +48,7 @@ $(document).ready(function() {
     initGameState();
 });
 
-/**
- * 开始新游戏
- */
+
 function startGame() {
     if (gameState.gameStarted) return;
     

@@ -1,88 +1,137 @@
 # 绿园中学物语 (Green Garden High School Story)
 
-## 本仓库在交作业后进行了彻底重构，检查作业时所参考的视频和文档，对应的代码版本我已经完整地保存在了 legacy-submission 分支上，您可以随时切换到这个分支来复现当时的状态。项目的 main 分支，现在是我重构后的最新版本，它更健壮、更高效，也是我未来继续开发和部署的版本。
+**绿园中学物语**是一款由大型语言模型驱动的恋爱模拟游戏。你将扮演主角，与多个可扩展的 AI 角色在绿园中学开启一段充满变量的校园故事。
 
-**绿园中学物语**是一款基于大型语言模型（LLM）驱动的、高度动态的恋爱模拟游戏。在这里，你将扮演男主角“陈辰”，与AI少女“苏糖”展开一段独一无二的校园恋情。
-
-不同于传统GalGame固定的选项和脚本，本作的核心在于一个拥有“统一心智”的AI。角色的情感、记忆和对话，都由同一个强大的语言模型实时分析和生成，为你带来真正身临其境的交互体验。
+目前项目以单角色 Demo 形式运行，核心功能已串联：从前端对话框到后端状态机再到 LLM 调用均可完整走通。以下内容总结了现阶段的实现情况，并指导你如何快速启动体验。
 
 ---
 
-## ✨ 核心特色
+## 📌 当前项目状态
 
-*   🧠 **统一心智AI (Unified Mind AI):** 告别“人工情感分析+AI回复”的分裂模式。角色的好感度变化、情绪波动、对话策略和最终回复，全部由LLM在一次调用中完成，实现了真正的情感与行为一致性。
-*   🗣️ **自然语言驱动:** 通过自由输入与角色进行对话，你的每一句话都会被AI深度理解，并影响你们的关系走向。
-*   💖 **动态情感系统:** AI会根据你的用词、语气、话题和上下文，实时更新她对你的好感度、心情甚至无聊度，并反映在她后续的言行中。
-*   💬 **Prompt驱动的角色塑造:** 角色的所有性格、背景、原则和行为逻辑都定义在清晰的Prompt模板中，实现了AI行为的高度可定制化和快速迭代。
-*   🌱 **极简核心架构:** 项目经过深度重构，移除了所有冗余和复杂的旧模块，形成了一个以`AI Agent`为核心的、轻量且易于扩展的全新架构。
+* ✅ **基础流程完成**：使用 Flask 提供 Web 接口，前端原生 HTML/CSS/JS，实现对话、好感度展示、存档与读档。
+* ✅ **AI 角色架构已成型**：以 `BaseCharacter` 为通用基类，角色以独立类扩展（当前示例为 `SuTangCharacter`）。完成 Prompt 渲染、DeepSeek Chat API 调用、分析 JSON 解析、状态回写等核心链路。
+* ✅ **存档系统可用**：`GameStorage` 以 JSON 文件形式管理存档，并带有简单版本信息与自动保存结局的能力。
+* ⚠️ **依赖外部 API**：默认使用 DeepSeek Chat，需要在环境变量或 `.env` 中提供 `DEEPSEEK_API_KEY`。
+* 🚧 **待办方向**：尚未接入长期记忆/向量库，也未实现多角色、多场景或复杂 UI 效果；README 中列出的未来计划仍未启动。
+
+---
+
+## ✨ 核心玩法亮点
+
+* 🧠 **统一心智 AI**：一次 LLM 请求同时输出角色回复与内心分析，确保情感与行为一致。
+* 💖 **可调情绪系统**：分析结果会调整好感度、无聊度、关系阶段，并驱动特殊事件（如表白剧情）。
+* 🗂️ **Prompt 驱动人格**：每个角色拥有独立的 Prompt 目录（示例：`prompts/su_tang/`），便于快速修改与扩展。
+* 💾 **轻量存档**：每次关键事件可自动保存，方便重复体验不同结局。
+
+---
 
 ## 🚀 技术栈
 
-*   **后端:** Python 3, Flask
-*   **AI核心:**
-    *   **对话与分析:** 依赖外部大语言模型API (如 DeepSeek, OpenAI GPT系列等)
-    *   **Prompt工程:** 通过结构化的Prompt模板 (`/prompts`) 指导LLM进行角色扮演和JSON格式的内心分析。
-*   **数据存储:**
-    *   **游戏存档:** JSON 文件 (`/saves`)
-    *   **(未来)长期记忆:** 计划使用向量数据库 (如 ChromaDB)
-*   **前端:** 原生 HTML / CSS / JavaScript
-
-## 🔧 如何运行
-
-1.  **克隆仓库**
-    ```bash
-    git clone https://github.com/你的用户名/Su_Tang.git
-    cd Su_Tang
-    ```
-
-2.  **创建并激活虚拟环境**
-    ```bash
-    python -m venv venv
-    # Windows
-    .\venv\Scripts\activate
-    # macOS/Linux
-    source venv/bin/activate
-    ```
-
-3.  **安装依赖**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **配置API密钥**
-    *   复制 `.env.example` 文件并重命名为 `.env`。
-    *   在 `.env` 文件中填入你的大语言模型API密钥：
-        ```
-        DEEPSEEK_API_KEY="sk-xxxxxxxxxxxxxxxx"
-        ```
-
-5.  **启动Web应用**
-    ```bash
-    python web_start.py
-    ```
-
-6.  在浏览器中打开 `http://127.0.0.1:5000` 即可开始游戏。
-
-## 🏛️ 项目新架构概览
-
-本项目采用了一个以AI Agent为中心的极简架构：
-
-*   **`web_start.py`**: 启动器，负责环境设置和启动Web服务器。
-*   **`web_app/`**: Flask应用目录。
-    *   **`app.py`**: 处理Web请求和API路由。
-    *   **`game_core.py`**: **新的、轻量级的游戏指挥中心**，负责连接Web界面和AI核心。
-*   **`Su_Tang.py`**: **AI Agent核心**，封装了所有与LLM的交互逻辑，包括构建Prompt、调用API、解析回复和更新内部状态。
-*   **`Game_Storage.py`**: 负责游戏的存档和读档。
-*   **`prompts/`**: **AI的“灵魂”所在**，存放定义角色行为的Prompt模板。
-*   **`config/`**: 存放游戏中的结构化数据，如角色档案。
-
-## 展望与计划
-
-*   [ ] **UI增强:** 在界面上实时显示角色的心情、关系等状态。
-*   [ ] **长期记忆:** 引入向量数据库，让角色拥有真正的长期记忆。
-*   [ ] **场景系统:** 重新引入并简化场景管理，让游戏世界更丰富。
-*   [ ] **事件系统:** 基于AI分析结果，动态触发特殊剧情事件。
+* **后端**：Python 3 + Flask（`web_app/app.py`）
+* **AI 调用**：DeepSeek Chat API（默认），可自行替换其他兼容的 Chat Completion 服务
+* **Agent 核心**：`BaseCharacter`（通用逻辑） + 各角色类（如 `SuTangCharacter`）
+* **存档**：JSON 文件（`saves/`）
+* **前端**：原生 HTML / Bootstrap / jQuery（伪打字机效果、好感度动画等）
 
 ---
 
-欢迎提出Issues和Pull Requests，一起创造更有灵魂的AI角色！
+## 🔧 如何运行
+
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/你的用户名/Lyuyuan_AI.git
+   cd Lyuyuan_AI
+   ```
+
+2. **创建并激活虚拟环境**
+   ```bash
+   python -m venv venv
+   # Windows
+   .\venv\Scripts\activate
+   # macOS/Linux
+   source venv/bin/activate
+   ```
+
+3. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **配置 API 密钥**
+   * 复制 `.env.example`（若不存在，可新建 `.env` 文件）。
+   * 在 `.env` 中写入：
+     ```
+     DEEPSEEK_API_KEY="sk-xxxxxxxxxxxxxxxx"
+     ```
+   * 也可以直接在系统环境变量中设置同名变量。
+
+5. **启动 Web 应用**
+   ```bash
+   python web_start.py
+   ```
+
+6. 在浏览器访问 `http://127.0.0.1:5000`，点击「开始游戏」按钮即可开始体验（默认示例为苏糖）。
+
+---
+
+## 🏛️ 当前架构速览
+
+```
+.
+├── web_start.py          # 统一入口：加载 .env、校验目录并启动 Flask
+├── base_character.py     # 可复用的 LLM 角色基类
+├── su_tang_character.py  # 示例角色：苏糖（实现与事件脚本）
+├── Game_Storage.py       # JSON 存档管理
+├── web_app/
+│   ├── app.py            # Flask 路由与 API
+│   ├── game_core.py      # SimpleGameCore，封装角色实例
+│   ├── templates/        # 页面模板（index.html 等）
+│   └── static/           # 前端资源（CSS、JS、图片）
+├── prompts/su_tang/      # 示例角色的 Prompt 模板与角色设定
+└── saves/                # 存档输出目录
+```
+
+---
+
+---
+
+## 🧩 如何新增一个角色（多角色指引）
+
+1) 新建角色类文件
+   - 在项目根目录创建 `your_role_character.py`，继承 `BaseCharacter`。
+   - 参考 `su_tang_character.py`：
+     - 指定角色名、欢迎语、默认状态（如 closeness、mood_today、last_topics 等）。
+     - 提供 `prompt_template_path` 与 `system_prompts`（角色设定与场景）。
+     - 可覆写钩子：`handle_special_commands`、`handle_pre_chat_events`、`handle_post_chat_events`、`get_backup_reply`。
+
+2) 准备 Prompt 目录
+   - 在 `prompts/` 下创建 `your_role/` 文件夹，至少包含：
+     - `analysis_prompt.txt`：指导 LLM 产出 <analysis> JSON 与 <response>。
+     - `your_role_prompt.txt`：角色世界观/说话风格等系统设定。
+
+3) 挂载到游戏核心
+   - 在 `web_app/game_core.py` 中把默认角色替换为你的角色：
+     ```python
+     from your_role_character import YourRoleCharacter
+     # ...
+     self.agent = YourRoleCharacter(is_new_game=True)
+     ```
+   - 如需运行时切换角色，可扩展为：根据 URL 参数/会话状态选择不同角色实例。
+
+4) 资源与前端
+   - 如有角色立绘，请放到 `web_app/static/images/`，并在前端按需切换显示逻辑。
+
+5) 存档兼容
+   - `GameStorage` 使用 JSON 存档；不同角色建议在存档中写入 `meta.role` 或以不同槽位/文件名区分，以避免混用状态。
+
+---
+
+## 🔭 下一步计划
+
+* [ ] UI 提示强化：在界面实时展示心情、事件提醒等
+* [ ] 记忆系统：引入向量数据库，支持长期记忆召回
+* [ ] 多角色选择：在启动页/菜单选择不同角色并热切换
+* [ ] 多场景扩展：让场景描述与剧情章节动态切换
+* [ ] 事件编排：基于分析结果触发更多分支剧情
+
+欢迎提出 Issues / PR，一起让角色们更有灵魂 💡

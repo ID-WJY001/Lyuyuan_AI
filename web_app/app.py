@@ -1,6 +1,4 @@
 # web_app/app.py
-# 最终的、简化的Web应用入口
-# 这个版本只依赖我们新建的 game_core.py，与其他旧模块完全解耦。
 
 from flask import Flask, render_template, request, jsonify, session
 import os
@@ -11,12 +9,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
-# [核心改动] 我们不再导入任何旧的管理器或工具函数
-# 而是直接导入我们新建的、干净的 game_core
 from web_app.game_core import game_core
 
-# 你可以保留你原来的load_env_file逻辑，如果它在一个你没删除的文件里
-# 否则，简单的os.environ.get就足够了
 if not os.environ.get("DEEPSEEK_API_KEY"):
     from dotenv import load_dotenv
     print("Loading .env file...")
@@ -61,8 +55,6 @@ def chat():
         print(f"!!! UNEXPECTED ERROR IN CHAT API !!!\n{traceback.format_exc()}")
         return jsonify({'error': '服务器发生未知错误', 'details': str(e)}), 500
 
-
-# [新] 重新启用存档/读档API，并连接到SimpleGameCore
 @app.route('/api/save', methods=['POST'])
 def save_game_api():
     print("[WEB_APP] Request to /api/save")
@@ -82,6 +74,6 @@ def load_game_api():
         })
     return jsonify({'success': False})
 
-# web_start.py 应该调用这个
+# web_start.py 调用
 if __name__ == "__main__":
     app.run(debug=False, port=5000, host="0.0.0.0")
