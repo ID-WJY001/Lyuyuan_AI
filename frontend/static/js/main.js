@@ -1,3 +1,5 @@
+// Main UI script for Green Garden High School Story
+
 // 游戏状态
 const gameState = {
     initialized: false,
@@ -10,42 +12,31 @@ const gameState = {
 
 // DOM加载完成后执行
 $(document).ready(function() {
-    // 绑定按钮事件
+    // 绑定按钮事件（仅绑定实际存在的元素）
     $("#start-game").click(startGame);
     $("#send-button").click(sendMessage);
-    $("#user-input").keypress(function(e) {
-        if (e.which === 13) { // Enter键
+    $("#user-input").on('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
             sendMessage();
         }
     });
-    
+
     // 初始化提示
     console.log("绿园中学物语 - Web版本已加载");
-    
-    // 开始游戏按钮点击事件
-    $("#start-btn").click(startGame);
-    
-    // 发送消息按钮点击事件
-    $("#send-btn").click(sendMessage);
-    
-    // 输入框回车键发送消息
-    $("#message-input").keypress(function(e) {
-        if (e.which === 13) {
-            sendMessage();
-            return false;
-        }
-    });
-    
+
     // 窗口大小改变时调整聊天窗口高度
-    $(window).resize(function() {
-        adjustChatHeight();
-    });
-    
+    $(window).on('resize', function() { adjustChatHeight(); });
+
     // 初始调整聊天窗口高度
     adjustChatHeight();
-    
+
     // 初始化游戏状态
     initGameState();
+
+    // 保存/读取按钮绑定
+    $("#save-button").on('click', saveGame);
+    $("#load-button").on('click', loadGame);
 });
 
 
@@ -60,6 +51,10 @@ function startGame() {
         url: "/api/start_game",
         type: "POST",
         contentType: "application/json",
+        data: JSON.stringify({
+            // 预留：将所选角色传给后端，默认示例为苏糖
+            role: $("#role-select").val() || "su_tang"
+        }),
         success: function(data) {
             // 隐藏欢迎界面，显示游戏界面
             $("#welcome-screen").fadeOut(500, function() {
@@ -68,8 +63,12 @@ function startGame() {
                 // 更新游戏状态
                 updateGameState(data.game_state);
                 
-                // 添加游戏介绍到聊天历史
-                addSystemMessage(data.intro_text);
+                // 优先使用后端历史记录（仅 user/assistant）；否则使用 intro_text
+                if (Array.isArray(data.history) && data.history.length > 0) {
+                    renderHistory(data.history);
+                } else if (data.intro_text) {
+                    addSystemMessage(data.intro_text);
+                }
                 
                 // 滚动到底部
                 scrollChatToBottom();
@@ -80,14 +79,86 @@ function startGame() {
                 
                 // 聚焦到输入框
                 $("#user-input").focus();
+
+                // 根据后端返回的角色键切换默认图（若返回）
+                if (data.character_key) {
+                    updateCharacterImage(undefined, data.character_key);
+                }
             });
         },
         error: function(xhr, status, error) {
-            showError("无法开始游戏: " + error);
+            addSystemMessage("无法开始游戏：" + escapeHtml(String(error || '未知错误')));
         },
         complete: function() {
             hideLoading();
         }
+    });
+}
+
+// 保存当前游戏到选定槽位
+function saveGame() {
+    const slot = parseInt($("#save-slot").val() || '1', 10);
+    showLoading("正在保存...");
+    $.ajax({
+        url: "/api/save",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ slot }),
+        success: function(res) {
+            if (res && res.success) {
+                showSuccess("保存成功 (槽位 " + slot + ")");
+            } else {
+                showError("保存失败");
+            }
+        },
+        error: function(xhr, status, error) {
+            showError("保存失败：" + escapeHtml(String(error || '未知错误')));
+        },
+        complete: function() { hideLoading(); }
+    });
+}
+
+// 从选定槽位读取游戏
+function loadGame() {
+    const slot = parseInt($("#save-slot").val() || '1', 10);
+    showLoading("正在读取...");
+    $.ajax({
+        url: "/api/load",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ slot }),
+        success: function(res) {
+            if (res && res.success && res.game_state) {
+                updateGameState(res.game_state);
+                // 根据返回的角色键刷新头像（若存在）
+                if (res.character_key) {
+                    updateCharacterImage(res.game_state.closeness, res.character_key);
+                }
+                // 若在欢迎界面，切换到游戏界面
+                if ($("#welcome-screen").is(":visible")) {
+                    $("#welcome-screen").hide();
+                    $(".game-screen").show();
+                }
+                // 重建聊天历史
+                if (Array.isArray(res.history) && res.history.length > 0) {
+                    renderHistory(res.history);
+                }
+                // 标记游戏已开始，避免再次点击“开始游戏”把状态重置
+                gameState.gameStarted = true;
+                gameState.initialized = true;
+                // 聚焦与滚动
+                $("#user-input").focus();
+                adjustChatHeight();
+                scrollChatToBottom();
+                showSuccess("读取成功 (槽位 " + slot + ")");
+            } else {
+                showError("读取失败或槽位为空");
+            }
+        },
+        error: function(xhr, status, error) {
+            showError("读取失败：" + escapeHtml(String(error || '未知错误')));
+        },
+        complete: function() { hideLoading(); }
     });
 }
 
@@ -145,16 +216,38 @@ function sendMessage() {
                     
                     // 打字结束后，再更新游戏状态（好感度条等），这样动画效果更自然
                     updateGameState(data.game_state);
-                    updateCharacterImage(data.game_state.closeness);
+                    updateCharacterImage(
+                        data.game_state.closeness,
+                        data.character_key || (data.game_state && data.game_state.role)
+                    );
                 }
             }, typingSpeed);
 
         },
         error: function(xhr, status, error) {
             removeTypingIndicator();
-            showError("发送消息失败: " + error);
+            addSystemMessage("发送消息失败：" + escapeHtml(String(error || '未知错误')));
         }
     });
+}
+
+// 根据后端的历史记录重建对话
+function renderHistory(history) {
+    const $chat = $("#chat-history");
+    $chat.empty();
+    if (!Array.isArray(history)) return;
+    history.forEach(msg => {
+        const role = (msg && msg.role) || '';
+        const content = (msg && msg.content) || '';
+        if (role === 'user') {
+            addUserMessage(content);
+        } else if (role === 'assistant') {
+            addAssistantMessage(content);
+        } else if (role === 'system') {
+            addSystemMessage(content);
+        }
+    });
+    scrollChatToBottom();
 }
 /**
  * 更新游戏状态显示
@@ -267,12 +360,26 @@ function updateGameState(state) {
 /**
  * 根据好感度更新角色图像
  */
-function updateCharacterImage(closeness) {
-    // 使用固定的图片，不再根据好感度切换
-    let imageName = "SuTang.jpg";
-    
-    // 设置图像源
-    $("#character-image").attr("src", `/static/images/${imageName}`);
+function updateCharacterImage(closeness, characterKey) {
+    // 简洁的角色图像策略：
+    // - 现在默认使用 su_tang.jpg
+    // - 如果后端返回 character_key，则按 `${character_key}.jpg` 加载
+    const key = String(characterKey || 'su_tang').toLowerCase();
+    const src = `/static/images/${key}.jpg`;
+    const fallback = '/static/images/su_tang.jpg';
+    const $img = $("#character-image");
+
+    // 避免重复绑定错误事件
+    $img.off('error');
+    $img.one('error', function() {
+        // 仅在首次加载失败时回退，避免死循环
+        $(this).off('error');
+        if ($(this).attr('src') !== fallback) {
+            $(this).attr('src', fallback);
+        }
+    });
+
+    $img.attr("src", src);
 }
 
 /**
@@ -305,9 +412,18 @@ function addAssistantMessage(text) {
 /**
  * 格式化消息文本（处理换行等）
  */
+function escapeHtml(unsafe) {
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function formatMessage(text) {
     if (!text) return "";
-    return text.replace(/\n/g, "<br>");
+    return escapeHtml(text).replace(/\n/g, "<br>");
 }
 
 /**
@@ -405,13 +521,8 @@ function hideLoading() {
 
 // 调整聊天窗口高度
 function adjustChatHeight() {
-    const windowHeight = $(window).height();
-    const navbarHeight = $(".navbar").outerHeight();
-    const inputAreaHeight = $(".message-input-container").outerHeight();
-    const bufferHeight = 20; // 额外的间距
-    
-    const chatHeight = windowHeight - navbarHeight - inputAreaHeight - bufferHeight;
-    $("#chat-history").css("height", chatHeight + "px");
+    // 使用固定视口高度，避免动态跳动带来的“上移”观感
+    $("#chat-history").css("height", "60vh");
 }
 
 // 初始化游戏状态

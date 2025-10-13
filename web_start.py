@@ -27,8 +27,8 @@ def setup_environment():
     else:
         logging.info("未找到.env文件，将依赖系统环境变量。")
         if not os.environ.get("DEEPSEEK_API_KEY"):
-            logging.error("致命错误: 在系统环境变量中也未找到DEEPSEEK_API_KEY！")
-            return False # 返回失败信号
+            # 放宽校验：没有密钥也允许启动，只在首次调用聊天时会失败
+            logging.warning("未找到DEEPSEEK_API_KEY，聊天功能将不可用。服务器仍将启动以便前端调试。")
 
     # 3. 确保必要的目录存在
     # os.makedirs 如果目录已存在会报错，所以加上 exist_ok=True
@@ -64,11 +64,11 @@ def main():
     # 2. 动态导入Flask app
     #    这样可以确保环境设置完成后再加载Web应用的代码
     try:
-        from web_app.app import app
+        from app import app
         logging.info("Web应用模块导入成功。")
     except ImportError as e:
         logging.error(f"导入Web应用时出错: {e}")
-        logging.error("请确保 web_app/app.py 和 web_app/game_core.py 文件存在且无语法错误。")
+        logging.error("请确保 app.py 及 backend 相关模块存在且无语法错误。")
         return
 
     # 3. 运行Flask应用

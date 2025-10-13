@@ -2,36 +2,20 @@
 __pycache__/
 *.py[cod]
 
-# Virtual Environment
+# Virtual Environments (do not commit venvs)
 .venv/
+venv/
 web_venv/
-Include/
-Lib/
-Scripts/
-pyvenv.cfg
 
-# IDE
+# Generated / runtime
+saves/
+*.log
+.env
+
+# Editor / IDE
 .vscode/
 .idea/
 
-# Configs & Sensitive Data
-config/
-affection_config*
-character.yaml
-userdict.txt
-
-# Generated Files
-saves/
-*.db
-## Narrow JSON ignore to saves only (avoid hiding config JSON elsewhere)
-saves/*.json
-*.log
-
-# Temporary Files
-*.tmp
-*.bak
-
-# Misc folders accidentally committed
-~/
-
-.env
+# OS junk
+Thumbs.db
+.DS_Store

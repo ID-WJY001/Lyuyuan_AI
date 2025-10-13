@@ -5,22 +5,21 @@ import random
 from pathlib import Path
 from typing import Dict, Optional
 
-from base_character import BaseCharacter
-from Game_Storage import GameStorage
+from backend.domain.characters.base_character import BaseCharacter
+from backend.game_storage import GameStorage
+from backend.config import PROMPTS_DIR
 
-# ---------------------------------------------------------------------------
-# Static configuration pieces reused across instances
 
-_ROOT_DIR = Path(__file__).resolve().parent
-_PROMPT_TEMPLATE_PATH = _ROOT_DIR / "prompts" / "su_tang" / "analysis_prompt.txt"
-_PROMPT_FILE_PATH = _ROOT_DIR / "prompts" / "su_tang" / "sutang_prompt.txt"
+_PROMPT_TEMPLATE_PATH = (PROMPTS_DIR / "su_tang" / "analysis_prompt.txt").resolve()
+_PROMPT_FILE_PATH = (PROMPTS_DIR / "su_tang" / "su_tang_prompt.txt").resolve()
 
 try:
     _PROMPT_FILE_TEXT = _PROMPT_FILE_PATH.read_text(encoding="utf-8")
 except FileNotFoundError:
     _PROMPT_FILE_TEXT = ""
 
-_CHARACTER_DETAILS = """
+_CHARACTER_DETAILS = (
+    """
 【背景信息】
 当前场景：绿园中学百团大战活动，苏糖正在烘焙社摊位前介绍社团活动
 互动对象：陈辰（男，高一一班学生）
@@ -28,12 +27,15 @@ _CHARACTER_DETAILS = """
 1. 请严格遵守角色设定，不要添加任何未在设定中明确提及的背景信息
 2. 关于苏糖的家庭情况，请仅限于已提供的信息：独生女，父亲是上市公司高管，母亲是大学老师，家庭和睦美满
 请你始终牢记以上设定，在回复中保持角色一致性，任何时候都不要忘记自己是谁、在哪里、和谁说话。
-""".strip()
+"""
+    .strip()
+)
 
 _CONTEXTUAL_GUIDELINE = "\n".join(
     [
-        "你是苏糖，绿园中学高一二班的学生，烘焙社社长。",
+        "你是苏糖，绿园中学高一二班的学生，烘焙社成员与钢琴社副社长，今天在烘焙社摊位负责招新。",
         "你是个温柔、甜美的女生，但也有自己的原则和底线。",
+        "当前地点：百团大战活动现场的烘焙社摊位，你正在给来访同学介绍社团并登记信息。",
         "陈辰是高一一班的学生，他对你产生了好感，正在尝试与你搭讪。",
     ]
 )
@@ -43,8 +45,8 @@ _DEFAULT_CONFIG: Dict = {
     "player_name": "陈辰",
     "prompt_template_path": str(_PROMPT_TEMPLATE_PATH),
     "system_prompts": [f"{_PROMPT_FILE_TEXT}\n\n{_CHARACTER_DETAILS}", _CONTEXTUAL_GUIDELINE],
-    "welcome_message": "（正在整理烘焙社的宣传材料）有什么我可以帮你的吗？",
-    "current_scene_description": "绿园中学百团大战活动，你正在烘焙社摊位前。",
+    "welcome_message": "（抬头露出礼貌的微笑）你好~ 我这边负责烘焙社今天的招新，如果你感兴趣我可以简单介绍一下~",
+    "current_scene_description": "绿园中学百团大战活动现场。你在烘焙社摊位负责招新与讲解活动内容。",
     "history_size": 100,
     "initial_state": {
         "closeness": 30,
@@ -61,7 +63,7 @@ _DEFAULT_CONFIG: Dict = {
 
 
 class SuTangCharacter(BaseCharacter):
-    """针对苏糖角色的具体实现，兼容旧版 :class:`GalGameAgent`."""
+    """针对苏糖角色的具体实现（backend 迁移版）。"""
 
     CONFESSION_ACCEPT_KEYWORDS = [
         "我也喜欢你",
@@ -105,9 +107,6 @@ class SuTangCharacter(BaseCharacter):
             print(f"加载存档#{load_slot}成功")
         else:
             self.start_new_game(is_new_game=is_new_game)
-
-    # ------------------------------------------------------------------
-    # Hooks
 
     def handle_special_commands(self, user_input: str) -> Optional[str]:
         if user_input.startswith("/debug closeness "):
@@ -157,9 +156,6 @@ class SuTangCharacter(BaseCharacter):
             "（笑容特别明亮）...",
         ]
         return random.choice(fallback_pool)
-
-    # ------------------------------------------------------------------
-    # Internal helpers
 
     @staticmethod
     def _merge_config(base: Dict, override: Dict) -> Dict:

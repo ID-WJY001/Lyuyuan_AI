@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>绿园中学物语</title>
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/icon.jpg') }}" type="image/x-icon">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,7 +27,16 @@
         </main>
         
         <footer class="py-3 text-center">
-            <p>© 2024 绿园中学物语</p>
+            <div class="d-flex justify-content-center align-items-center gap-2 mb-2">
+                <select id="save-slot" class="form-select" style="width: 120px;">
+                    <option value="1">槽位 1</option>
+                    <option value="2">槽位 2</option>
+                    <option value="3">槽位 3</option>
+                </select>
+                <button id="save-button" class="btn btn-outline-primary">保存</button>
+                <button id="load-button" class="btn btn-outline-secondary">读取</button>
+            </div>
+            <p>© 2025 绿园中学物语</p>
         </footer>
     </div>
 
@@ -39,4 +48,4 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
-</html> 
+</html>

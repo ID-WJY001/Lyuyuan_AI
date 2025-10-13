@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block extra_css %}{% endblock %}
+
+{% block content %}
+<div class="row game-screen" style="display: none;">
+    <div class="col-md-4">
+        <!-- 角色区域 -->
+        <div class="character-container">
+            <img src="{{ url_for('static', filename='images/su_tang.jpg') }}" alt="苏糖" class="character-image" id="character-image">
+        </div>
+        
+        <!-- 状态信息区域 -->
+        <div class="status-container">
+            <h4>角色信息</h4>
+            <div class="mb-2">
+                <label for="affection-bar" class="form-label">好感度: <span id="affection-value">30</span></label>
+                <div class="progress">
+                    <div id="affection-bar" class="progress-bar bg-danger" role="progressbar" style="width: 30%;" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+            
+            <div class="row mb-1">
+                <div class="col-4">关系:</div>
+                <div class="col-8" id="relationship-status">初始阶段</div>
+            </div>
+            
+            <div class="row mb-1">
+                <div class="col-4">场景:</div>
+                <div class="col-8" id="scene-info">学校 - 百团大战</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- 聊天和输入区域包装 -->
+        <div class="chat-section">
+            <!-- 对话区域 -->
+            <div class="chat-container" id="chat-history">
+                <!-- 对话内容将通过JS动态添加 -->
+            </div>
+            
+            <!-- 输入区域 -->
+            <div class="chat-input-container">
+                <div class="input-group">
+                    <input type="text" id="user-input" class="form-control" placeholder="输入你想说的话...">
+                    <button class="btn btn-primary" id="send-button">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 欢迎页面 -->
+<div class="welcome-screen" id="welcome-screen">
+    <h2>欢迎来到绿园中学物语</h2>
+    <p class="lead">选择角色后开始你的校园故事</p>
+
+    <img src="{{ url_for('static', filename='images/su_tang.jpg') }}" alt="角色预览" class="mb-3" style="max-height: 300px;">
+
+    <div class="mb-3">
+        <label for="role-select" class="form-label">选择角色</label>
+        <select id="role-select" class="form-select" style="max-width: 260px; margin: 0 auto;">
+            <option value="su_tang" selected>苏糖（示例）</option>
+            <!-- 预留：后续在这里添加更多角色选项 -->
+        </select>
+    </div>
+
+    <div>
+        <button id="start-game" class="btn btn-success game-button">开始游戏</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 游戏主要JavaScript将通过单独的JS文件加载
+</script>
+{% endblock %}

@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 
+
 class GameStorage:
     def __init__(self, save_dir="saves"):
         """

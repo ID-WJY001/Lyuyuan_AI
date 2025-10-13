@@ -1,9 +1,4 @@
-flask==2.3.3
-pillow==10.1.0
-werkzeug==2.3.7
-jinja2==3.1.2
-itsdangerous==2.1.2
-click==8.1.7
-pyyaml==6.0.1
-openai==1.19.0 
+flask==3.1.0
+requests==2.32.3
+python-dotenv==1.0.1
 jieba==0.42.1

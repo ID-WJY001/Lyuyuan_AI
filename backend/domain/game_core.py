@@ -1,9 +1,9 @@
-# web_app/game_core.py
+from backend.domain.characters.su_tang_character import SuTangCharacter
 
-from su_tang_character import SuTangCharacter
 
 class SimpleGameCore:
     def __init__(self):
+        print("[BACKEND] Initializing SimpleGameCore (backend.domain)")
         self.agent = SuTangCharacter(is_new_game=True)
 
     def start_new_game(self):
@@ -21,5 +21,6 @@ class SimpleGameCore:
 
     def load_game(self, slot):
         return self.agent.load(slot)
+
 
 game_core = SimpleGameCore()
