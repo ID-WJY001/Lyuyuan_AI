@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>绿园中学物语</title>
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/icon.jpg') }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,9 +32,17 @@
                     <option value="1">槽位 1</option>
                     <option value="2">槽位 2</option>
                     <option value="3">槽位 3</option>
+                    <option value="4">槽位 4</option>
+                    <option value="5">槽位 5</option>
                 </select>
+                <input id="save-label" type="text" class="form-control" placeholder="可选：存档名称" style="width: 180px;">
                 <button id="save-button" class="btn btn-outline-primary">保存</button>
                 <button id="load-button" class="btn btn-outline-secondary">读取</button>
+                <button id="list-saves-button" class="btn btn-outline-dark">存档列表</button>
+            </div>
+            <div id="saves-list" class="container" style="max-width: 760px; display:none;">
+                <div class="text-start small text-muted mb-1">最近存档：</div>
+                <ul id="saves-list-ul" class="list-group"></ul>
             </div>
             <p>© 2025 绿园中学物语</p>
         </footer>

@@ -13,7 +13,7 @@ class GameService:
         print("[BACKEND] game_service using backend.domain.game_core")
 
     def start_game(self, role=None):
-        return self._core.start_new_game()
+        return self._core.start_new_game(role)
 
     def chat(self, message: str) -> str:
         return self._core.chat(message)

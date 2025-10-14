@@ -37,6 +37,19 @@ $(document).ready(function() {
     // 保存/读取按钮绑定
     $("#save-button").on('click', saveGame);
     $("#load-button").on('click', loadGame);
+    $("#list-saves-button").on('click', listSaves);
+
+    // 欢迎页：切换角色时更新预览图
+    $("#role-select").on('change', function() {
+        const key = String($(this).val() || 'su_tang').toLowerCase();
+        updatePreviewImage(key);
+        updateRoleBrief(key);
+    });
+
+    // 首次进入时，根据默认选项初始化预览图
+    const initKey = String($("#role-select").val() || 'su_tang').toLowerCase();
+    updatePreviewImage(initKey);
+    updateRoleBrief(initKey);
 });
 
 
@@ -84,6 +97,11 @@ function startGame() {
                 if (data.character_key) {
                     updateCharacterImage(undefined, data.character_key);
                 }
+                if (data.character_name) {
+                    $("#character-name").text(String(data.character_name));
+                } else if (data.character_key) {
+                    $("#character-name").text(mapKeyToName(data.character_key));
+                }
             });
         },
         error: function(xhr, status, error) {
@@ -97,13 +115,14 @@ function startGame() {
 
 // 保存当前游戏到选定槽位
 function saveGame() {
-    const slot = parseInt($("#save-slot").val() || '1', 10);
+    const slot = $("#save-slot").val() || '1';
+    const label = $("#save-label").val().trim();
     showLoading("正在保存...");
     $.ajax({
         url: "/api/save",
         type: "POST",
         contentType: "application/json",
-        data: JSON.stringify({ slot }),
+        data: JSON.stringify({ slot, label: label || undefined }),
         success: function(res) {
             if (res && res.success) {
                 showSuccess("保存成功 (槽位 " + slot + ")");
@@ -120,7 +139,7 @@ function saveGame() {
 
 // 从选定槽位读取游戏
 function loadGame() {
-    const slot = parseInt($("#save-slot").val() || '1', 10);
+    const slot = $("#save-slot").val() || '1';
     showLoading("正在读取...");
     $.ajax({
         url: "/api/load",
@@ -157,6 +176,44 @@ function loadGame() {
         },
         error: function(xhr, status, error) {
             showError("读取失败：" + escapeHtml(String(error || '未知错误')));
+        },
+        complete: function() { hideLoading(); }
+    });
+}
+
+// 列出存档
+function listSaves() {
+    const $panel = $("#saves-list");
+    const $ul = $("#saves-list-ul");
+    $ul.empty();
+    showLoading("正在加载存档列表...");
+    $.ajax({
+        url: "/api/saves",
+        type: "GET",
+        success: function(res) {
+            const items = (res && res.saves) || [];
+            if (!Array.isArray(items) || items.length === 0) {
+                $ul.append('<li class="list-group-item">暂无存档</li>');
+            } else {
+                items.forEach(it => {
+                    const role = (it.meta && (it.meta.role || it.meta.character_name)) || '未知角色';
+                    const label = (it.meta && it.meta.label) ? (' - ' + it.meta.label) : '';
+                    const time = (it.meta && it.meta.timestamp) || it.mtime || '';
+                    const slot = it.slot || '';
+                    const line = `${escapeHtml(String(role))}${escapeHtml(label)} | 槽位: ${escapeHtml(String(slot))} | 时间: ${escapeHtml(String(time))}`;
+                    const li = $(`<li class="list-group-item d-flex justify-content-between align-items-center">${line}<button class="btn btn-sm btn-outline-primary">读取</button></li>`);
+                    li.find('button').on('click', function() {
+                        // 将下拉选中为该槽位并读取
+                        $("#save-slot").val(String(slot));
+                        loadGame();
+                    });
+                    $ul.append(li);
+                });
+            }
+            $panel.show();
+        },
+        error: function(xhr, status, error) {
+            showError("获取存档列表失败：" + escapeHtml(String(error || '未知错误')));
         },
         complete: function() { hideLoading(); }
     });
@@ -220,6 +277,11 @@ function sendMessage() {
                         data.game_state.closeness,
                         data.character_key || (data.game_state && data.game_state.role)
                     );
+                    if (data.character_name) {
+                        $("#character-name").text(String(data.character_name));
+                    } else if (data.character_key) {
+                        $("#character-name").text(mapKeyToName(data.character_key));
+                    }
                 }
             }, typingSpeed);
 
@@ -261,8 +323,13 @@ function updateGameState(state) {
     // 更新好感度
     const closeness = parseInt(state.closeness) || 30;
     
-    // 如果好感度发生变化，添加动画效果
-    if (oldCloseness !== closeness) {
+    // 首次进入：直接设置为初始好感度，不做从30到初始值的动画
+    if (!gameState.initialized) {
+        $("#affection-value").text(closeness);
+        $("#affection-bar").css("width", closeness + "%").attr("aria-valuenow", closeness);
+    }
+    // 非首次，且好感度发生变化时才做动画
+    else if (oldCloseness !== closeness) {
         // 显示变化提示
         const delta = closeness - oldCloseness;
         const deltaText = delta > 0 ? `+${delta}` : delta;
@@ -325,7 +392,7 @@ function updateGameState(state) {
         
         // 开始动画
         requestAnimationFrame(updateProgressBar);
-    } else {
+    } else if (gameState.initialized) {
         // 无变化时直接更新
         $("#affection-value").text(closeness);
         $("#affection-bar").css("width", closeness + "%").attr("aria-valuenow", closeness);
@@ -362,24 +429,60 @@ function updateGameState(state) {
  */
 function updateCharacterImage(closeness, characterKey) {
     // 简洁的角色图像策略：
-    // - 现在默认使用 su_tang.jpg
-    // - 如果后端返回 character_key，则按 `${character_key}.jpg` 加载
-    const key = String(characterKey || 'su_tang').toLowerCase();
-    const src = `/static/images/${key}.jpg`;
-    const fallback = '/static/images/su_tang.jpg';
+    // - 现在默认使用 su_tang.png
+    // - 如果后端返回 character_key，则按 `${character_key}.png` 加载
+    const key = String(characterKey || 'su_tang').toLowerCase()
+    const srcPng = `/static/images/${key}.png`;
+    const fallback = '/static/images/favicon.ico';
     const $img = $("#character-image");
 
-    // 避免重复绑定错误事件
-    $img.off('error');
-    $img.one('error', function() {
-        // 仅在首次加载失败时回退，避免死循环
-        $(this).off('error');
+    // 仅在资源加载失败时回退
+    $img.off('error').one('error', function() {
         if ($(this).attr('src') !== fallback) {
             $(this).attr('src', fallback);
         }
     });
+    $img.attr("src", srcPng);
+}
 
-    $img.attr("src", src);
+// 欢迎页预览图切换
+function updatePreviewImage(characterKey) {
+    const key = String(characterKey || 'su_tang').toLowerCase();
+    const $img = $("#role-preview-image");
+    const srcPng = `/static/images/${key}.png`;
+    const fallback = '/static/images/favicon.ico';
+
+    // 仅在加载失败时回退，不做二次同源尝试
+    $img.off('error').one('error', function() {
+        if ($(this).attr('src') !== fallback) {
+            $(this).attr('src', fallback);
+        }
+    });
+    $img.attr('src', srcPng);
+}
+
+// 角色键到名称的简单映射
+function mapKeyToName(key) {
+    const m = {
+        'su_tang': '苏糖',
+        'lin_yuhan': '林雨含',
+        'luo_yimo': '罗一莫',
+        'gu_pan': '顾盼',
+        'xia_xingwan': '夏星晚'
+    };
+    return m[String(key).toLowerCase()] || '苏糖';
+}
+
+// 欢迎页简要角色与场景介绍
+function updateRoleBrief(key) {
+    const briefs = {
+        'su_tang': '在烘焙社摊位前的温柔女孩；甜点与音乐是她的安全感（初始好感度 30）。',
+        'lin_yuhan': '舞蹈社附近的气氛担当；元气直给，也会认真安慰（初始好感度 50）。',
+        'luo_yimo': '科技协会附近的慢热同学；话不多但认真听，细节里有温度（初始好感度 35）。',
+        'gu_pan': '桌游社附近常能遇到他；会接梗也会收住，让人不尴尬（初始好感度 40）。',
+        'xia_xingwan': '操场与网球社之间的身影；自律里有温柔，很会照顾人（初始好感度 38）。'
+    };
+    $("#role-brief").text(briefs[String(key).toLowerCase()] || '');
 }
 
 /**

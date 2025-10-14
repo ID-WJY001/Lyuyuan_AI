@@ -41,6 +41,7 @@ _CONTEXTUAL_GUIDELINE = "\n".join(
 )
 
 _DEFAULT_CONFIG: Dict = {
+    "role_key": "su_tang",
     "name": "苏糖",
     "player_name": "陈辰",
     "prompt_template_path": str(_PROMPT_TEMPLATE_PATH),

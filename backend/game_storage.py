@@ -40,10 +40,13 @@ class GameStorage:
         Returns:
             bool: 如果保存成功则返回 True，否则返回 False。
         """
-        data["meta"] = {
+        # 合并/补全 meta（避免覆盖上层写入的角色、名称等信息）
+        meta = data.get("meta", {})
+        meta.update({
             "timestamp": datetime.now().isoformat(),
-            "version": "1.0"
-        }
+            "version": "1.0",
+        })
+        data["meta"] = meta
         
         # 处理日期时间对象
         if "state" in data and "date" in data["state"] and isinstance(data["state"]["date"], datetime):
@@ -90,3 +93,43 @@ class GameStorage:
             list: 包含所有存档文件名的列表 (例如, ["save_1.json", "save_happy_ending.json"])。
         """
         return [f for f in os.listdir(self.save_dir) if f.endswith(".json")]
+
+    def list_saves_detailed(self):
+        """列出包含详细信息的存档列表。
+
+        返回每个存档的：
+        - id: 去除扩展名后的标识（如 save_1）
+        - filename: 完整文件名
+        - slot: 槽位/标识（从文件名中提取 '1' 或 'happy_ending'）
+        - meta: 文件中保存的 meta（若有）
+        - size_bytes: 文件大小
+        - mtime: 修改时间 ISO 字符串
+        """
+        result = []
+        for fname in self.list_saves():
+            fpath = os.path.join(self.save_dir, fname)
+            try:
+                stat = os.stat(fpath)
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    content = json.load(f)
+                meta = content.get('meta', {}) if isinstance(content, dict) else {}
+                slot = fname.replace('save_', '').replace('.json', '')
+                result.append({
+                    'id': fname[:-5],
+                    'filename': fname,
+                    'slot': slot,
+                    'meta': meta,
+                    'size_bytes': stat.st_size,
+                    'mtime': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+            except Exception as e:
+                # 跳过无法解析的存档
+                result.append({
+                    'id': fname[:-5],
+                    'filename': fname,
+                    'slot': fname.replace('save_', '').replace('.json', ''),
+                    'meta': { 'error': str(e) },
+                    'size_bytes': None,
+                    'mtime': None,
+                })
+        return sorted(result, key=lambda x: (x['mtime'] or ''), reverse=True)

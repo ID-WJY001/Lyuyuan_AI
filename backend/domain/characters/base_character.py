@@ -440,9 +440,29 @@ class BaseCharacter:
             return fallback
 
     def save(self, slot) -> bool:
+        # 规范化常用字段
         if "closeness" in self.game_state:
             self.game_state["closeness"] = int(self.game_state["closeness"])
-        data = {"history": self.dialogue_history, "state": self.game_state}
+
+        # 存档主体
+        data = {
+            "history": self.dialogue_history,
+            "state": self.game_state,
+            "meta": {
+                # 角色识别与展示
+                "role": self.config.get("role_key") or self.name,
+                "character_name": self.name,
+                # 最近对话时间（粗略：以保存时间为准，GameStorage 会加 precise timestamp）
+                "last_updated": None,
+                # 兼容字段
+                "version": "1.0",
+            },
+        }
+        # 若 state 中存在临时写入的 label/name 字段，可一并保存到 meta
+        for key in ("label", "name"):
+            if key in self.game_state and isinstance(self.game_state[key], str):
+                data["meta"]["label"] = self.game_state[key]
+                break
         return self.storage.save_game(data, slot)
 
     def load(self, slot) -> bool:

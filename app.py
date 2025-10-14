@@ -52,8 +52,14 @@ def start_game():
     session['character_key'] = role
 
     initial_data = game_service.start_game(role)
-    # 为前端提供角色键，默认 'su_tang'
+    # 为前端提供角色键与角色名称
     initial_data['character_key'] = role
+    try:
+        agent = getattr(getattr(game_service, '_core', None), 'agent', None)
+        if agent and getattr(agent, 'name', None):
+            initial_data['character_name'] = str(agent.name)
+    except Exception:
+        pass
     # 不向前端暴露 system 提示词；如果历史里只有 system，则让前端显示 intro_text
     if 'history' in initial_data:
         initial_data['history'] = _filter_history_for_client(initial_data.get('history'))
@@ -72,11 +78,18 @@ def chat():
         response_text = game_service.chat(user_input)
         current_state = game_service.get_state()
 
-        return jsonify({
+        payload = {
             'response': str(response_text), # 强制转字符串，更安全
             'game_state': current_state,
             'character_key': session.get('character_key', 'su_tang')
-        })
+        }
+        try:
+            agent = getattr(getattr(game_service, '_core', None), 'agent', None)
+            if agent and getattr(agent, 'name', None):
+                payload['character_name'] = str(agent.name)
+        except Exception:
+            pass
+        return jsonify(payload)
     except Exception as e:
         import traceback
         print(f"!!! UNEXPECTED ERROR IN CHAT API !!!\n{traceback.format_exc()}")
@@ -85,25 +98,72 @@ def chat():
 @app.route('/api/save', methods=['POST'])
 def save_game_api():
     print("[API] Request to /api/save")
-    slot = request.json.get('slot', 1)
+    payload = request.get_json(silent=True) or {}
+    slot = payload.get('slot', 1)
+    # 可选命名：label 或 name（写入 meta.label）
+    label = payload.get('label') or payload.get('name')
+    if label:
+        try:
+            # 将 label 写到当前 agent 的 state，BaseCharacter.save 会自动带入 meta
+            agent = getattr(getattr(game_service, '_core', None), 'agent', None)
+            if agent and hasattr(agent, 'game_state') and isinstance(agent.game_state, dict):
+                agent.game_state['label'] = str(label)
+        except Exception:
+            pass
     success = game_service.save(slot)
     return jsonify({'success': success})
 
 @app.route('/api/load', methods=['POST'])
 def load_game_api():
     print("[API] Request to /api/load")
-    slot = request.json.get('slot', 1)
-    success = game_service.load(slot)
+    payload = request.get_json(silent=True) or {}
+    slot = payload.get('slot', 1)
+    # 先读取一次存档 meta，用于判断角色
+    from backend.game_storage import GameStorage
+    storage = GameStorage()
+    raw = storage.load_game(slot)
+    target_role = None
+    if raw and isinstance(raw, dict):
+        meta = raw.get('meta') or {}
+        target_role = meta.get('role')
+    # 若存档包含 role，尝试在开始新游戏时切换到对应角色
+    if target_role:
+        try:
+            game_service.start_game(target_role)
+            session['character_key'] = str(target_role)
+            # 用加载覆盖状态
+            success = game_service.load(slot)
+        except Exception:
+            success = game_service.load(slot)
+    else:
+        success = game_service.load(slot)
     if success:
         raw_history = getattr(getattr(game_service, '_core', None), 'agent', None)
         raw_history = raw_history.dialogue_history if raw_history else []
-        return jsonify({
+        payload = {
             'success': True,
             'game_state': game_service.get_state(),
             'history': _filter_history_for_client(raw_history),
             'character_key': session.get('character_key', 'su_tang')
-        })
+        }
+        try:
+            agent = getattr(getattr(game_service, '_core', None), 'agent', None)
+            if agent and getattr(agent, 'name', None):
+                payload['character_name'] = str(agent.name)
+        except Exception:
+            pass
+        return jsonify(payload)
     return jsonify({'success': False})
+
+
+@app.route('/api/saves', methods=['GET'])
+def list_saves_api():
+    """列出存档（包含 meta），便于前端展示角色与保存时间。"""
+    print("[API] Request to /api/saves")
+    from backend.game_storage import GameStorage
+    storage = GameStorage()
+    items = storage.list_saves_detailed()
+    return jsonify({'saves': items})
 
 # web_start.py 调用
 if __name__ == "__main__":

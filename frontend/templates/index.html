@@ -7,7 +7,8 @@
     <div class="col-md-4">
         <!-- 角色区域 -->
         <div class="character-container">
-            <img src="{{ url_for('static', filename='images/su_tang.jpg') }}" alt="苏糖" class="character-image" id="character-image">
+            <img src="{{ url_for('static', filename='images/su_tang.png') }}" alt="苏糖" class="character-image" id="character-image">
+            <div class="text-center mt-2"><span id="character-name" class="fw-bold">苏糖</span></div>
         </div>
         
         <!-- 状态信息区域 -->
@@ -56,14 +57,20 @@
     <h2>欢迎来到绿园中学物语</h2>
     <p class="lead">选择角色后开始你的校园故事</p>
 
-    <img src="{{ url_for('static', filename='images/su_tang.jpg') }}" alt="角色预览" class="mb-3" style="max-height: 300px;">
+    <img id="role-preview-image" src="{{ url_for('static', filename='images/su_tang.png') }}" alt="角色预览" class="mb-3" style="max-height: 300px;">
 
     <div class="mb-3">
         <label for="role-select" class="form-label">选择角色</label>
         <select id="role-select" class="form-select" style="max-width: 260px; margin: 0 auto;">
-            <option value="su_tang" selected>苏糖（示例）</option>
-            <!-- 预留：后续在这里添加更多角色选项 -->
+            <option value="su_tang" selected>苏糖</option>
+            <option value="lin_yuhan">林雨含</option>
+            <option value="luo_yimo">罗一莫</option>
+            <option value="gu_pan">顾盼</option>
+            <option value="xia_xingwan">夏星晚</option>
         </select>
+        <div id="role-brief" class="small text-muted mt-2" style="max-width: 420px; margin: 8px auto 0;">
+            在烘焙社摊位前的温柔女孩；甜点与音乐是她的安全感。
+        </div>
     </div>
 
     <div>
