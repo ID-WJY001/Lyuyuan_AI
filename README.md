@@ -1,30 +1,16 @@
 # 绿园中学物语 (Green Garden High School Story)
 
-> v1.0.0 — 多角色首发版：五名可选角色、统一分析模板、人设去标签化、首页简介含初始好感度、首帧动画优化。
+> v1.0.1 — 多角色首发版：五名可选角色、统一分析模板、人设去标签化。
 
-**绿园中学物语**是一款由 LLM 驱动的轻叙事 RPG。你将扮演主角，与多个有“温度”的 AI 角色在绿园中学游逛、搭话与靠近。
-
-本版起，支持五名角色与更稳定的人设表达；从前端 UI 到后端状态与 Prompt 均做了结构化升级。
+**绿园中学物语**是一款由 LLM 驱动的轻叙事 RPG。你将扮演主角，在学校百团大战时与多个有“温度”的 AI 角色在绿园中学游逛、搭话与靠近。
 
 ---
 
-## 🆕 v1.0.0 有哪些变化
+## 🆕 玩法亮点
 
-- 多角色可选（5 人）：苏糖、林雨含、罗一莫、顾盼、夏星晚（欢迎页下拉选择）
-- 角色简介更清晰：首页显示每个角色简述与“初始好感度”
-- 人设去标签化：去除“模板腔”（如过度招新/教练口吻/清单式建议），加入“场景任务克制”规则，优先跟随玩家话题
-- 统一分析模板：所有角色遵循同一 <analysis>/<response> 输出规范，稳定产出 JSON 分析并驱动好感/无聊变更
-- 首帧动画优化：进入游戏时好感度条直接定位到初始值，不再从 30 动画到初始值
-- 存档槽位扩展：页面底部存档槽位 1→5
-- 前端显示角色名：聊天界面立绘下方实时显示当前角色名称
-- 图像与占位：立绘统一为 `.png`；加载失败回退为 `favicon.ico`
-
----
-
-## ✨ 玩法亮点
-
+- ✨ 多角色可选（5 人）：苏糖、林雨含、罗一莫、顾盼、夏星晚（欢迎页下拉选择）
 - 🧠 一次请求，双通道产出：角色回复 + 内心分析（JSON），保证“说/想/改状态”一致
-- 💖 情绪与关系：根据分析调整好感度、无聊度、关系阶段，并触发事件（例如表白）
+- 💖 情绪与关系：根据分析调整好感度、无聊度、关系阶段，并触发事件
 - 🗂️ Prompt 驱动人格：角色 Persona + Analysis 模板可快速迭代，支持“风格与人情味”约束
 - 💾 轻量存档：JSON 文件存档，前端一键保存/读取，槽位 1-5
 
@@ -49,7 +35,7 @@
 - Agent：`BaseCharacter` 通用基类 + 角色类（`backend/domain/characters/`）
 - 存档：`GameStorage`（JSON 到 `saves/`）
 - 前端：原生 HTML/Bootstrap/jQuery（伪打字机、进度条动画、选择器、AJAX）
-- 立绘：`frontend/static/images/*.png`，错误回退到 `favicon.ico`
+- 立绘：`frontend/static/images/*.png`
 
 ```
 .
@@ -77,7 +63,7 @@
 
 在开始之前，请确保：
 
-- 已安装 Python 3.10+（建议 3.11/3.12）。检查：
+- 已安装 Python 3.10+（建议 3.12/3.13）。检查：
 
 ```powershell
 python --version; pip --version
@@ -139,6 +125,34 @@ python web_start.py
 - 终止服务：在该终端按 Ctrl+C。
 
 浏览器访问 http://127.0.0.1:5000，选择角色后“开始游戏”。
+
+---
+
+## ⚡ 一行启动（可选：使用 uv）
+
+[uv](https://github.com/astral-sh/uv) 是一个超快的 Python 包管理与执行工具，支持按 `pyproject.toml` 自动解析依赖。已提供 `pyproject.toml`，可无需手动创建虚拟环境：
+
+### 安装 uv
+
+Windows (PowerShell)：
+```powershell
+pip install uv  # 或参考官方安装脚本
+```
+
+macOS/Linux：
+```bash
+pip install uv  # 或使用官方安装方式
+```
+
+### 直接运行
+
+```bash
+uv run web_start.py
+```
+
+第一次会自动解析依赖并创建隔离环境（缓存复用）。你仍可并行保留传统 venv 方式；二者互不冲突。
+
+> 若需要进入一个交互 shell：`uv run python`；或安装开发可选依赖：`uv add <package>`。
 
 ---
 
@@ -227,48 +241,4 @@ python3 web_start.py
 
 ---
 
-## 🧠 Prompt 与分析规范（统一）
-
-- 所有角色使用统一的分析输出结构，LLM 必须在 `<analysis>` 中给出严格 JSON：
-  - `thought_process`, `player_emotion_guess`, `player_intent_guess`, `response_strategy`,
-    `affection_delta_reason`, `affection_delta (-5..+5)`, `boredom_delta (-3..+3)`,
-    `mood_change`, `triggered_topics`
-- `<response>` 为最终对话文本；服务端解析后更新状态并入历史
-- “场景任务克制”：招新/拉场等为背景，只在自然需要时点到；优先跟随玩家的当下话题与情绪
-- 风格规则（示例）：短句优先、一次一个小建议、允许自然停顿、可点到轻量生活细节、避免“清单/教程/教练腔”
-
----
-
-## 💾 存档与资源
-
-- 存档：`saves/save_{slot}.json`（槽位 1-5，或更多）
-- 立绘：`frontend/static/images/{role_key}.png`；失败回退 `favicon.ico`
-- 角色名：接口返回 `character_name`，前端立绘下方展示
-- 初始好感：欢迎页简介显示；进入游戏首帧直接按初始值渲染进度条（无 30→初始动画）
-
----
-
-## 🛠️ 开发与协作
-
-- 依赖（最小集）：Flask、requests、python-dotenv、jieba
-- 本地虚拟环境不提交：`.venv/`、`venv/`、`web_venv/` 已在 `.gitignore`
-- 若曾误提交本地环境，可用：
-  ```powershell
-  git rm -r --cached web_venv
-  git commit -m "chore: stop tracking local virtual env web_venv"
-  ```
-- 立绘命名规范：与角色键一致（`su_tang.png` 等）
-
----
-
-## 🔭 路线图
-
-- [ ] 更丰富的事件流与分支
-- [ ] 记忆系统（向量库）与长期关系演化
-- [ ] 多场景与章节推进
-- [ ] UI 提示与状态小组件（心情、触发事件）
-- [ ] 更多角色与差异化互动机制
-
----
-
-一起把角色们打磨得更有灵魂 💡
+## 最新版本：v1.0.1 （2025.10.15）

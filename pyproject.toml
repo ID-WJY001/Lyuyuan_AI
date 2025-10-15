@@ -1,0 +1,21 @@
+[project]
+name = "lyuyuan-ai"
+version = "1.0.0"
+description = "LLM-driven multi-character school narrative demo"
+authors = [ { name = "ID-WJY001" } ]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "flask==3.1.0",
+    "requests==2.32.3",
+    "python-dotenv==1.0.1",
+    "jieba==0.42.1",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
