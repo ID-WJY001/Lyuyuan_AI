@@ -10,6 +10,7 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from backend.services.game_service import game_service
+from backend.settings import SECRET_KEY, HOST as SETTINGS_HOST, PORT as SETTINGS_PORT, DEBUG as SETTINGS_DEBUG
 
 if not os.environ.get("DEEPSEEK_API_KEY"):
     from dotenv import load_dotenv
@@ -25,7 +26,7 @@ app = Flask(
     template_folder='frontend/templates',
     static_url_path='/static'
 )
-app.secret_key = 'a_very_secret_key_for_sutang_reborn'
+app.secret_key = SECRET_KEY
 
 
 def _filter_history_for_client(history):
@@ -167,4 +168,5 @@ def list_saves_api():
 
 # web_start.py 调用
 if __name__ == "__main__":
-    app.run(debug=False, port=5000, host="0.0.0.0")
+    # 兜底：若直接运行 app.py，则使用 settings 配置
+    app.run(debug=SETTINGS_DEBUG, port=SETTINGS_PORT, host=SETTINGS_HOST)

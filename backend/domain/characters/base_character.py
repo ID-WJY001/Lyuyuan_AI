@@ -14,6 +14,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 import requests
 
 from backend.game_storage import GameStorage
+from backend.domain.memory_system import MemorySystem
+from backend.domain.proactive_system import ProactiveSystem
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +78,10 @@ class BaseCharacter:
 
         self._prompt_template_cache: Optional[str] = None
 
+        # Phase 1: 记忆与主动性系统
+        self.memory_system = MemorySystem()
+        self.proactive_system = ProactiveSystem(character_name=self.name)
+
     def start_new_game(self, is_new_game: bool = False) -> Dict[str, object]:
         self.game_state = copy.deepcopy(self._initial_state_template)
         self.dialogue_history = self._build_initial_messages(is_new_game=is_new_game)
@@ -106,6 +112,20 @@ class BaseCharacter:
     def chat(self, user_input: str) -> str:
         print("\n" + "#" * 20 + f" NEW CHAT REQUEST ({self.name}) " + "#" * 20)
         print(f"User Input: {user_input}")
+
+        # Phase 1: 主动问候检测
+        from datetime import datetime
+        current_time = datetime.now()
+        if self.proactive_system.should_greet_proactively(current_time):
+            time_gap = (current_time - self.proactive_system.last_chat_time).total_seconds() / 3600
+            greeting = self.proactive_system.generate_greeting(
+                time_gap,
+                self.game_state.get("relationship_state", "初始阶段"),
+                self.game_state.get("closeness", 30)
+            )
+            if greeting:
+                user_input = f"[AI主动问候: {greeting}]\n{user_input}"
+                print(f"[PROACTIVE] 主动问候已添加")
 
         special = self.handle_special_commands(user_input)
         if special is not None:
@@ -175,6 +195,9 @@ class BaseCharacter:
         self.dialogue_history.append({"role": "assistant", "content": ai_response})
         self._trim_history()
 
+        # Phase 1: 更新最后聊天时间
+        self.proactive_system.update_last_chat_time()
+
         print("[DEBUG] Step 6: Chat method finished. Returning response.")
 
         post_response = self.handle_post_chat_events(user_input, analysis, ai_response)
@@ -225,6 +248,11 @@ class BaseCharacter:
         history_str = self._format_history_for_prompt()
         topics = self.game_state.get("last_topics") or []
         topics_str = ", ".join(topics) if topics else "无"
+
+        # Phase 1: 注入记忆
+        memories = self.memory_system.get_relevant_memories(user_input, top_k=5)
+        memories_str = "\n".join(f"- {m}" for m in memories) if memories else "（暂无重要记忆）"
+
         return {
             "relationship_state": self.game_state.get("relationship_state", "初始阶段"),
             "closeness": self.game_state.get("closeness", 30),
@@ -233,6 +261,7 @@ class BaseCharacter:
             "current_scene_description": self.scene_description,
             "conversation_history": history_str,
             "user_input": user_input,
+            "important_memories": memories_str,
         }
 
     def _call_llm(self, filled_prompt: str) -> str:
@@ -376,6 +405,14 @@ class BaseCharacter:
             self.game_state["last_topics"] = merged[:5]
             print(f"[STATE] Updated last topics: {self.game_state['last_topics']}")
 
+        # Phase 1: 提取新记忆
+        if "new_memory" in analysis and analysis["new_memory"]:
+            memory_content = analysis["new_memory"]
+            category = analysis.get("memory_category", "shared_moment")
+            importance = analysis.get("memory_importance", 2)
+            self.memory_system.add_memory(memory_content, category, importance)
+            print(f"[MEMORY] 新记忆已保存: {memory_content}")
+
     def handle_analysis_failure(self, result: Dict, user_input: str) -> None:
         logger.warning("Analysis missing or invalid; skipping state update.")
 
@@ -449,16 +486,15 @@ class BaseCharacter:
             "history": self.dialogue_history,
             "state": self.game_state,
             "meta": {
-                # 角色识别与展示
                 "role": self.config.get("role_key") or self.name,
                 "character_name": self.name,
-                # 最近对话时间（粗略：以保存时间为准，GameStorage 会加 precise timestamp）
                 "last_updated": None,
-                # 兼容字段
-                "version": "1.0",
+                "version": "1.1",
             },
+            # Phase 1: 持久化记忆和主动系统
+            "memory": self.memory_system.to_dict(),
+            "proactive": self.proactive_system.to_dict(),
         }
-        # 若 state 中存在临时写入的 label/name 字段，可一并保存到 meta
         for key in ("label", "name"):
             if key in self.game_state and isinstance(self.game_state[key], str):
                 data["meta"]["label"] = self.game_state[key]
@@ -476,6 +512,12 @@ class BaseCharacter:
         defaults.update(state)
         self.game_state = defaults
         self._update_relationship_state()
+
+        # Phase 1: 恢复记忆和主动系统
+        if "memory" in data:
+            self.memory_system.from_dict(data["memory"])
+        if "proactive" in data:
+            self.proactive_system.from_dict(data["proactive"])
         return True
 
     def get_state_snapshot(self) -> Dict:

@@ -19,3 +19,8 @@ saves/
 # OS junk
 Thumbs.db
 .DS_Store
+
+.claude
+CLAUDE.md
+
+docs/

@@ -73,11 +73,10 @@ def main():
 
     # 3. 运行Flask应用
     try:
-        logging.info("正在启动Web服务器，请在浏览器中访问 http://127.0.0.1:5000")
+        from backend.settings import PORT, HOST
+        logging.info(f"正在启动Web服务器，请在浏览器中访问 http://127.0.0.1:{PORT}")
         logging.info("按 CTRL+C 退出服务器。")
-        # 使用 waitress 或 gunicorn 替换 app.run 是生产环境的最佳实践
-        # 但对于开发，app.run 足够了
-        app.run(debug=False, host='0.0.0.0', port=5000)
+        app.run(debug=False, host=HOST, port=PORT)
     except Exception as e:
         logging.error(f"启动Web应用时发生未知错误: {e}")
 
