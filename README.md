@@ -1,29 +1,30 @@
 # 绿园中学物语 (Green Garden High School Story)
 
-> v1.1.1 — 架构升级版：LLM提供商解耦、多提供商支持、完整测试体系
+> v1.1.2 — 插件化角色系统：YAML配置驱动、热加载、零代码添加角色
 
 **绿园中学物语**是一款由 LLM 驱动的轻叙事 RPG。你将扮演主角，在学校百团大战时与多个有”温度”的 AI 角色在绿园中学游逛、搭话与靠近。
 
 ---
 
-## 🆕 v1.1.1 更新内容
+## 🆕 v1.1.2 更新内容
 
-### 架构升级
-- ✨ **LLM提供商解耦**: 统一的LLM接口，支持多个提供商（DeepSeek、OpenAI）
-- 🔌 **可扩展架构**: 通过工厂模式轻松添加新的LLM提供商
-- ⚙️ **配置驱动**: 通过环境变量切换LLM提供商和参数
-- 🚀 **异步支持**: 原生支持异步调用和流式输出（基础设施层）
+### 插件化角色系统
+- 📝 **YAML配置驱动**: 角色配置完全独立于代码，使用YAML格式定义
+- 🔄 **热加载支持**: CharacterLoader自动缓存和验证配置
+- ➕ **零代码添加角色**: 只需创建YAML文件即可添加新角色，无需修改代码
+- 🎯 **统一配置格式**: 包含基本信息、人格设定、提示词、场景设置等完整配置
 
-### 测试体系
-- 📋 **完整测试文档**: 包含前后端所有功能的测试流程
-- 🧪 **自动化测试**: Python和Bash测试脚本
-- 📖 **OpenAPI规范**: 完整的API文档（OpenAPI 3.0）
-- ✅ **测试覆盖**: 100%的API端点和功能覆盖
+### 角色加载器
+- 🏗️ **CharacterLoader类**: 统一的角色配置加载和管理
+- ✅ **配置验证**: 自动验证YAML配置的完整性和正确性
+- 💾 **智能缓存**: 避免重复加载，提升性能
+- 🔌 **BaseCharacter转换**: 自动将YAML配置转换为BaseCharacter格式
 
-### 开发体验
-- 📚 **完善文档**: 开发指南、架构设计、测试流程
-- 🛠️ **开发工具**: 测试脚本、配置模板
-- 📝 **代码规范**: 统一的代码风格和最佳实践
+### 配置结构
+- 基本信息：角色ID、名称、初始好感度
+- 人格设定：性格特点、说话风格、行为模式
+- 提示词路径：角色提示词和分析提示词
+- 场景设置：初始场景、位置、氛围描述
 
 ---
 
@@ -64,8 +65,9 @@
 ├── web_start.py                 # 统一入口：加载 .env、检查目录、启动 Flask
 ├── app.py                       # 路由：/api/start_game /api/chat /api/save /api/load
 ├── backend/
-│   ├── infrastructure/          # 基础设施层（新增）
-│   │   └── llm/                 # LLM提供商抽象层
+│   ├── infrastructure/          # 基础设施层
+│   │   ├── llm/                 # LLM提供商抽象层
+│   │   └── character_loader/    # 角色配置加载器（新增）
 │   ├── domain/
 │   │   ├── characters/          # BaseCharacter + 各角色类
 │   │   ├── memory_system.py     # 记忆系统
@@ -73,12 +75,15 @@
 │   ├── services/                # Service 包装（game_service）
 │   ├── game_storage.py          # JSON 存档
 │   └── settings.py              # 配置管理
-├── docs/                        # 完整文档（新增）
+├── characters/                  # 角色YAML配置（新增）
+│   └── su_tang.yaml             # 苏糖角色配置
+├── docs/                        # 完整文档
 │   ├── testing-guide.md         # 测试流程
 │   ├── openapi.md               # API规范
 │   └── development-plan.md      # 发展计划
-└── tests/                       # 测试脚本（新增）
-    └── api_test.py              # 自动化测试
+└── tests/                       # 测试脚本
+    ├── api_test.py              # 自动化测试
+    └── test_character_loader.py # 角色加载器测试（新增）
 ```
 ├── frontend/
 │   ├── templates/               # index.html / layout.html
@@ -300,6 +305,12 @@ python tests/api_test.py
 ---
 
 ## 🔄 版本历史
+
+### v1.1.2 (2026-03-14)
+- 📝 YAML配置驱动的角色系统
+- 🔄 CharacterLoader角色加载器
+- ➕ 零代码添加新角色
+- ✅ 配置验证和智能缓存
 
 ### v1.1.1 (2026-03-14)
 - ✨ LLM提供商解耦，支持多提供商（DeepSeek、OpenAI）
