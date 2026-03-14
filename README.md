@@ -1,12 +1,33 @@
 # 绿园中学物语 (Green Garden High School Story)
 
-> v1.0.1 — 多角色首发版：五名可选角色、统一分析模板、人设去标签化。
+> v1.1.1 — 架构升级版：LLM提供商解耦、多提供商支持、完整测试体系
 
-**绿园中学物语**是一款由 LLM 驱动的轻叙事 RPG。你将扮演主角，在学校百团大战时与多个有“温度”的 AI 角色在绿园中学游逛、搭话与靠近。
+**绿园中学物语**是一款由 LLM 驱动的轻叙事 RPG。你将扮演主角，在学校百团大战时与多个有”温度”的 AI 角色在绿园中学游逛、搭话与靠近。
 
 ---
 
-## 🆕 玩法亮点
+## 🆕 v1.1.1 更新内容
+
+### 架构升级
+- ✨ **LLM提供商解耦**: 统一的LLM接口，支持多个提供商（DeepSeek、OpenAI）
+- 🔌 **可扩展架构**: 通过工厂模式轻松添加新的LLM提供商
+- ⚙️ **配置驱动**: 通过环境变量切换LLM提供商和参数
+- 🚀 **异步支持**: 原生支持异步调用和流式输出（基础设施层）
+
+### 测试体系
+- 📋 **完整测试文档**: 包含前后端所有功能的测试流程
+- 🧪 **自动化测试**: Python和Bash测试脚本
+- 📖 **OpenAPI规范**: 完整的API文档（OpenAPI 3.0）
+- ✅ **测试覆盖**: 100%的API端点和功能覆盖
+
+### 开发体验
+- 📚 **完善文档**: 开发指南、架构设计、测试流程
+- 🛠️ **开发工具**: 测试脚本、配置模板
+- 📝 **代码规范**: 统一的代码风格和最佳实践
+
+---
+
+## 🎮 玩法亮点
 
 - ✨ 多角色可选（5 人）：苏糖、林雨含、罗一莫、顾盼、夏星晚（欢迎页下拉选择）
 - 🧠 一次请求，双通道产出：角色回复 + 内心分析（JSON），保证“说/想/改状态”一致
@@ -30,8 +51,9 @@
 
 ## 🏗️ 技术栈与结构
 
-- 后端：Python 3 + Flask（`app.py` 路由，`backend/` 领域与服务）
-- LLM：DeepSeek Chat API（可替换），以 system+user 组合发起推理
+- 后端：Python 3.10+ + Flask（`app.py` 路由，`backend/` 领域与服务）
+- LLM：多提供商支持（DeepSeek、OpenAI），可通过配置切换
+- 基础设施：统一的LLM接口层（`backend/infrastructure/llm/`）
 - Agent：`BaseCharacter` 通用基类 + 角色类（`backend/domain/characters/`）
 - 存档：`GameStorage`（JSON 到 `saves/`）
 - 前端：原生 HTML/Bootstrap/jQuery（伪打字机、进度条动画、选择器、AJAX）
@@ -42,12 +64,22 @@
 ├── web_start.py                 # 统一入口：加载 .env、检查目录、启动 Flask
 ├── app.py                       # 路由：/api/start_game /api/chat /api/save /api/load
 ├── backend/
+│   ├── infrastructure/          # 基础设施层（新增）
+│   │   └── llm/                 # LLM提供商抽象层
 │   ├── domain/
-│   │   ├── characters/          # BaseCharacter + 各角色类（SuTang / LinYuhan / LuoYimo / GuPan / XiaXingwan）
-│   │   └── game_core.py         # 角色工厂与聊天/状态分发
+│   │   ├── characters/          # BaseCharacter + 各角色类
+│   │   ├── memory_system.py     # 记忆系统
+│   │   └── proactive_system.py  # 主动性系统
 │   ├── services/                # Service 包装（game_service）
 │   ├── game_storage.py          # JSON 存档
-│   └── config.py                # PROMPTS_DIR 等
+│   └── settings.py              # 配置管理
+├── docs/                        # 完整文档（新增）
+│   ├── testing-guide.md         # 测试流程
+│   ├── openapi.md               # API规范
+│   └── development-plan.md      # 发展计划
+└── tests/                       # 测试脚本（新增）
+    └── api_test.py              # 自动化测试
+```
 ├── frontend/
 │   ├── templates/               # index.html / layout.html
 │   └── static/
@@ -242,3 +274,40 @@ python3 web_start.py
 ---
 
 ### 最新版本：v1.0.1 （2025.10.15）
+---
+
+## 📚 文档
+
+- **[QUICKSTART.md](QUICKSTART.md)** - 快速启动指南
+- **[CLAUDE.md](CLAUDE.md)** - 项目开发指南
+- **[docs/testing-guide.md](docs/testing-guide.md)** - 完整测试流程
+- **[docs/openapi.md](docs/openapi.md)** - API规范文档
+- **[docs/development-plan.md](docs/development-plan.md)** - 5阶段发展计划
+
+## 🧪 测试
+
+运行自动化测试：
+```bash
+# 确保服务器正在运行
+python web_start.py
+
+# 在新终端运行测试
+python tests/api_test.py
+```
+
+查看完整测试文档：[docs/testing-guide.md](docs/testing-guide.md)
+
+---
+
+## 🔄 版本历史
+
+### v1.1.1 (2026-03-14)
+- ✨ LLM提供商解耦，支持多提供商（DeepSeek、OpenAI）
+- 📋 完整测试体系（测试文档、自动化脚本、OpenAPI规范）
+- 🏗️ 基础设施层重构
+- 📚 完善的开发文档
+
+### v1.0.1 (2025-10-15)
+- ✨ 多角色首发版：五名可选角色
+- 🧠 统一分析模板
+- 💖 人设去标签化
