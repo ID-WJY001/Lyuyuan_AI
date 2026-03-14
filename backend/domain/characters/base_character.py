@@ -16,6 +16,7 @@ import requests
 from backend.game_storage import GameStorage
 from backend.domain.memory_system import MemorySystem
 from backend.domain.proactive_system import ProactiveSystem
+from backend.infrastructure.events import Event, EventType, get_event_bus
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,24 @@ class BaseCharacter:
         self.memory_system = MemorySystem()
         self.proactive_system = ProactiveSystem(character_name=self.name)
 
+        # Phase 1.3: 事件系统
+        self.event_bus = get_event_bus()
+        self.role_key = config.get("role_key", self.name)
+
     def start_new_game(self, is_new_game: bool = False) -> Dict[str, object]:
         self.game_state = copy.deepcopy(self._initial_state_template)
         self.dialogue_history = self._build_initial_messages(is_new_game=is_new_game)
+
+        # 发布游戏开始事件
+        self.event_bus.publish(Event(
+            event_type=EventType.GAME_STARTED,
+            data={
+                "character": self.role_key,
+                "character_name": self.name,
+                "initial_closeness": self.game_state.get("closeness", 30)
+            },
+            source=f"character.{self.role_key}"
+        ))
 
         intro_text = ""
         for message in reversed(self.dialogue_history):
@@ -424,6 +440,19 @@ class BaseCharacter:
         if new_value != current:
             print(f"好感度变化: {current} -> {new_value} (变化: {delta})")
             self.game_state["closeness"] = new_value
+
+            # 发布好感度变化事件
+            self.event_bus.publish(Event(
+                event_type=EventType.CLOSENESS_CHANGED,
+                data={
+                    "character": self.role_key,
+                    "old_value": current,
+                    "new_value": new_value,
+                    "delta": delta
+                },
+                source=f"character.{self.role_key}"
+            ))
+
             self._update_relationship_state()
             if new_value >= 100 and "confession_triggered" not in self.game_state:
                 print("亲密度达到100，下次对话将触发表白事件！")
@@ -431,6 +460,8 @@ class BaseCharacter:
 
     def _update_relationship_state(self) -> None:
         closeness = self.game_state.get("closeness", 30)
+        old_state = self.game_state.get("relationship_state", "初始阶段")
+
         if closeness >= 80:
             state = "亲密关系"
         elif closeness >= 60:
@@ -439,8 +470,22 @@ class BaseCharacter:
             state = "朋友"
         else:
             state = "初始阶段"
-        self.game_state["relationship_state"] = state
-        print(f"关系状态更新为: {self.game_state['relationship_state']}")
+
+        if state != old_state:
+            self.game_state["relationship_state"] = state
+            print(f"关系状态更新为: {self.game_state['relationship_state']}")
+
+            # 发布关系状态变化事件
+            self.event_bus.publish(Event(
+                event_type=EventType.RELATIONSHIP_CHANGED,
+                data={
+                    "character": self.role_key,
+                    "old_state": old_state,
+                    "new_state": state,
+                    "closeness": closeness
+                },
+                source=f"character.{self.role_key}"
+            ))
 
     def _trim_history(self) -> None:
         if len(self.dialogue_history) <= self.history_size:
@@ -499,7 +544,22 @@ class BaseCharacter:
             if key in self.game_state and isinstance(self.game_state[key], str):
                 data["meta"]["label"] = self.game_state[key]
                 break
-        return self.storage.save_game(data, slot)
+
+        result = self.storage.save_game(data, slot)
+
+        # 发布游戏保存事件
+        if result:
+            self.event_bus.publish(Event(
+                event_type=EventType.GAME_SAVED,
+                data={
+                    "character": self.role_key,
+                    "slot": slot,
+                    "closeness": self.game_state.get("closeness", 30)
+                },
+                source=f"character.{self.role_key}"
+            ))
+
+        return result
 
     def load(self, slot) -> bool:
         data = self.storage.load_game(slot)
@@ -518,6 +578,19 @@ class BaseCharacter:
             self.memory_system.from_dict(data["memory"])
         if "proactive" in data:
             self.proactive_system.from_dict(data["proactive"])
+
+        # 发布游戏加载事件
+        self.event_bus.publish(Event(
+            event_type=EventType.GAME_LOADED,
+            data={
+                "character": self.role_key,
+                "slot": slot,
+                "closeness": self.game_state.get("closeness", 30),
+                "relationship_state": self.game_state.get("relationship_state", "初始阶段")
+            },
+            source=f"character.{self.role_key}"
+        ))
+
         return True
 
     def get_state_snapshot(self) -> Dict:

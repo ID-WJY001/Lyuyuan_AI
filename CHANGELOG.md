@@ -7,6 +7,53 @@
 
 ---
 
+## [1.1.3] - 2026-03-14
+
+### 新增 (Added)
+- **事件系统核心**: 事件驱动架构实现 (`backend/infrastructure/events.py`)
+  - `EventType` 枚举：定义所有事件类型（对话、状态、游戏、系统）
+  - `Event` 数据类：事件数据结构，包含类型、数据、时间戳、来源、优先级
+  - `EventBus` 类：事件总线实现
+    - 事件订阅和取消订阅
+    - 事件发布和分发
+    - 事件历史记录（最多1000条）
+    - 事件类型过滤
+    - 错误处理和日志记录
+  - `get_event_bus()` 函数：全局事件总线单例
+
+- **BaseCharacter事件集成**: 角色状态变更自动触发事件
+  - `GAME_STARTED` 事件：游戏开始时触发
+  - `CLOSENESS_CHANGED` 事件：好感度变化时触发
+  - `RELATIONSHIP_CHANGED` 事件：关系状态变化时触发
+  - `GAME_SAVED` 事件：游戏保存时触发
+  - `GAME_LOADED` 事件：游戏加载时触发
+
+- **示例监听器**: 展示事件系统使用方法 (`backend/infrastructure/event_listeners.py`)
+  - `EventLogger`：日志监听器，记录所有事件到日志
+  - `GameStatistics`：统计监听器，收集游戏数据和好感度历史
+  - `AchievementSystem`：成就系统监听器，监听事件解锁成就
+
+- **测试**: 完整的单元测试和集成测试
+  - `tests/test_events.py`：事件系统核心功能测试
+  - `tests/test_character_events.py`：BaseCharacter事件集成测试
+  - 所有测试通过 ✅
+
+### 变更 (Changed)
+- **BaseCharacter**: 集成事件系统
+  - 在 `__init__` 中初始化事件总线
+  - 在关键方法中添加事件发布
+  - 保持向后兼容，事件系统为可选功能
+
+- **README更新**: 更新为v1.1.3，添加事件驱动架构说明
+
+### 技术改进 (Technical)
+- 解耦系统架构：模块间通过事件通信，无需直接依赖
+- 提升可扩展性：添加新功能只需注册监听器
+- 改善可调试性：事件历史记录方便追踪问题
+- 支持动态扩展：可以在运行时添加/移除监听器
+
+---
+
 ## [1.1.2] - 2026-03-14
 
 ### 新增 (Added)
